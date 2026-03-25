@@ -8,9 +8,9 @@ class Settings(BaseSettings):
 
     DB_HOST: str = "localhost"
     DB_PORT: int = 5432
-    DB_USER: str = "aun"
-    DB_PASSWORD: str = "changeme"
-    DB_NAME: str = "aun"
+    DB_USER: str
+    DB_PASSWORD: str
+    DB_NAME: str
 
     @computed_field
     @property
