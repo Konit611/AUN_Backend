@@ -2,9 +2,11 @@ def test_list_sake(client):
     res = client.get("/api/v1/sake")
     assert res.status_code == 200
     data = res.json()
-    assert len(data) >= 1
-    assert "id" in data[0]
-    assert "name" in data[0]
+    assert "items" in data
+    assert len(data["items"]) >= 9
+    assert "id" in data["items"][0]
+    assert "name" in data["items"][0]
+    assert data["page"] == 1
 
 
 def test_get_sake_detail(client):

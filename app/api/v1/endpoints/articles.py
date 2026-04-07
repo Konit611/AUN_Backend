@@ -1,4 +1,7 @@
 from fastapi import APIRouter, HTTPException
+from typing import Optional
+
+from app.api.v1.schemas import paginate
 
 router = APIRouter()
 
@@ -18,12 +21,12 @@ ARTICLES = [
         "categoryLabel": "蔵元の物語",
         "date": "2026-03-28",
         "readTime": "8 min",
-        "emoji": "\U0001f3ef",
+        "emoji": "🏯",
         "excerpt": "新潟県長岡市に佇む朝日酒造。1830年の創業以来、越後の厳しい冬と豊かな水が育んだ酒造りの伝統を、現代の技術と融合させてきた。",
         "body": [
             {"type": "paragraph", "text": "新潟県長岡市に佇む朝日酒造。1830年の創業以来、越後の厳しい冬と豊かな水が育んだ酒造りの伝統を、現代の技術と融合させてきた。代表銘柄「久保田」は、1985年の発売以来、日本酒の新しいスタンダードを築き上げた。"},
             {"type": "heading", "text": "越後の水、越後の米"},
-            {"type": "image", "emoji": "\U0001f4a7", "caption": "朝日酒造の仕込み水は、地下深くから汲み上げた軟水を使用"},
+            {"type": "image", "emoji": "💧", "caption": "朝日酒造の仕込み水は、地下深くから汲み上げた軟水を使用"},
             {"type": "paragraph", "text": "酒造りの根幹をなすのは、水と米。朝日酒造が使う仕込み水は、越後山脈の雪解け水が地下で長い年月をかけて磨かれた軟水だ。この水が、久保田のすっきりとしたキレ味を生み出している。"},
             {"type": "paragraph", "text": "米にもこだわりがある。自社で契約栽培する「五百万石」と「越淡麗」を主に使用し、精米から一貫して管理する。特に久保田 萬寿に使われる越淡麗は、50%まで磨き上げることで、雑味のない透明感のある味わいを実現している。"},
             {"type": "heading", "text": "伝統と革新の共存"},
@@ -40,17 +43,17 @@ ARTICLES = [
         "categoryLabel": "日本酒の知識",
         "date": "2026-03-20",
         "readTime": "6 min",
-        "emoji": "\U0001f321\ufe0f",
+        "emoji": "🌡️",
         "excerpt": "同じ一本の日本酒でも、温度を変えるだけで全く異なる表情を見せる。冷酒のシャープさ、常温のまろやかさ、燗酒の包容力。",
         "body": [
-            {"type": "paragraph", "text": "日本酒は世界でも珍しい、幅広い温度帯で楽しめるお酒だ。5\u00b0Cの冷酒から55\u00b0Cの飛び切り燗まで、約50度もの温度幅の中で、それぞれ異なる魅力を発揮する。"},
-            {"type": "heading", "text": "冷酒（5〜15\u00b0C）"},
+            {"type": "paragraph", "text": "日本酒は世界でも珍しい、幅広い温度帯で楽しめるお酒だ。5°Cの冷酒から55°Cの飛び切り燗まで、約50度もの温度幅の中で、それぞれ異なる魅力を発揮する。"},
+            {"type": "heading", "text": "冷酒（5〜15°C）"},
             {"type": "paragraph", "text": "大吟醸や吟醸酒など、華やかな香りを楽しむタイプは冷酒がおすすめ。果物のようなフルーティーな香りが際立ち、すっきりとした飲み口が楽しめる。ただし冷やしすぎると香りが閉じてしまうので、冷蔵庫から出して少し待つのがコツ。"},
-            {"type": "heading", "text": "常温（15〜25\u00b0C）"},
+            {"type": "heading", "text": "常温（15〜25°C）"},
             {"type": "paragraph", "text": "「冷や」とも呼ばれる常温は、日本酒本来の味わいを最もストレートに感じられる温度帯。米の旨味やコク、酸味のバランスが自然に広がる。純米酒や本醸造酒で試してみてほしい。"},
-            {"type": "heading", "text": "燗酒（40〜55\u00b0C）"},
-            {"type": "image", "emoji": "\u2668\ufe0f", "caption": "ぬる燗（40\u00b0C）は、最も多くの日本酒に合う万能な温度帯"},
-            {"type": "paragraph", "text": "燗にすると、冷酒では感じにくかった米の甘みやコクが膨らみ、まろやかな口当たりに変化する。特にぬる燗（40\u00b0C前後）は、料理との相性も抜群。脂の乗った魚や煮物と合わせると、互いの旨味が引き立て合う至福のペアリングが完成する。"},
+            {"type": "heading", "text": "燗酒（40〜55°C）"},
+            {"type": "image", "emoji": "♨️", "caption": "ぬる燗（40°C）は、最も多くの日本酒に合う万能な温度帯"},
+            {"type": "paragraph", "text": "燗にすると、冷酒では感じにくかった米の甘みやコクが膨らみ、まろやかな口当たりに変化する。特にぬる燗（40°C前後）は、料理との相性も抜群。脂の乗った魚や煮物と合わせると、互いの旨味が引き立て合う至福のペアリングが完成する。"},
             {"type": "quote", "text": "燗酒は日本酒の懐の深さを教えてくれる。同じ酒でも、5度違うだけで別物になる。", "author": "ソムリエ 山田太郎"},
         ],
     },
@@ -62,7 +65,7 @@ ARTICLES = [
         "categoryLabel": "蔵元の物語",
         "date": "2026-03-12",
         "readTime": "10 min",
-        "emoji": "\U0001f30f",
+        "emoji": "🌏",
         "excerpt": "かつて廃業寸前だった旭酒造が、データ駆動の酒造りと大胆なブランディングで世界的な成功を収めた。その裏には、常識を覆す決断の連続があった。",
         "body": [
             {"type": "paragraph", "text": "山口県岩国市の山奥に位置する旭酒造。1984年、三代目社長の桜井博志が家業を継いだとき、年間売上はピーク時の3分の1にまで落ち込んでいた。地方の小さな蔵が生き残るために、彼が選んだ道は「量より質」への大転換だった。"},
@@ -82,7 +85,7 @@ ARTICLES = [
         "categoryLabel": "日本酒の知識",
         "date": "2026-03-05",
         "readTime": "7 min",
-        "emoji": "\U0001f33e",
+        "emoji": "🌾",
         "excerpt": "日本酒の味わいを大きく左右する酒米。それぞれの品種が持つ個性を知れば、日本酒選びがもっと楽しくなる。",
         "body": [
             {"type": "paragraph", "text": "日本酒造りに使われる酒造好適米は、食用米とは異なる特別な品種だ。粒が大きく、中心部に「心白」と呼ばれるデンプン質の白い部分がある。この心白が、日本酒の透明感のある味わいを生み出す鍵となっている。"},
@@ -102,12 +105,12 @@ ARTICLES = [
         "categoryLabel": "酒の文化",
         "date": "2026-02-25",
         "readTime": "9 min",
-        "emoji": "\U0001f5fe",
+        "emoji": "🗾",
         "excerpt": "日本で最も多くの酒蔵を擁する新潟県。雪国の厳しい気候が育んだ「淡麗辛口」の文化は、いかにして生まれたのか。",
         "body": [
             {"type": "paragraph", "text": "新潟県には約90の酒蔵がひしめく。人口あたりの酒蔵数は日本一。この数字が示すのは、新潟の人々がいかに日本酒を愛し、生活の中に根付かせてきたかということだ。"},
             {"type": "heading", "text": "雪が育てる酒"},
-            {"type": "image", "emoji": "\u2744\ufe0f", "caption": "豪雪地帯の酒蔵では、雪の冷気を利用した低温発酵が行われる"},
+            {"type": "image", "emoji": "❄️", "caption": "豪雪地帯の酒蔵では、雪の冷気を利用した低温発酵が行われる"},
             {"type": "paragraph", "text": "新潟の酒造りに欠かせないのが、豊富な雪解け水と厳しい寒さだ。冬の間、蔵の中は自然と低温に保たれ、ゆっくりと発酵が進む。この環境が、新潟特有のすっきりとした味わいを生み出している。"},
             {"type": "quote", "text": "新潟の酒は、雪のように透明で、雪のように静かに心に染みる。", "author": "新潟県酒造組合"},
             {"type": "paragraph", "text": "JR新潟駅構内にある「ぽんしゅ館」では、県内すべての酒蔵の酒を利き酒できる。500円でコイン5枚を購入し、壁一面に並ぶ自動販売機型の利き酒マシンから好みの一杯を選ぶ。旅の始まりに、まずはここで新潟の酒の多様性を体感してほしい。"},
@@ -121,13 +124,18 @@ def _article_without_body(article: dict) -> dict:
 
 
 @router.get("/articles")
-def list_articles():
-    return [_article_without_body(a) for a in ARTICLES]
+def list_articles(
+    page: int = 1,
+    page_size: int = 20,
+    category: Optional[str] = None,
+):
+    filtered = ARTICLES
+    if category and category != "all":
+        filtered = [a for a in ARTICLES if a["category"] == category]
 
-
-@router.get("/articles/filters")
-def get_filters():
-    return CATEGORY_FILTERS
+    result = paginate([_article_without_body(a) for a in filtered], page, page_size)
+    result["filters"] = {"categories": CATEGORY_FILTERS}
+    return result
 
 
 @router.get("/articles/{slug}")

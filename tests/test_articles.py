@@ -2,18 +2,23 @@ def test_list_articles(client):
     res = client.get("/api/v1/articles")
     assert res.status_code == 200
     data = res.json()
-    assert len(data) == 5
-    assert "body" not in data[0]
-    assert "slug" in data[0]
-    assert "title" in data[0]
+    assert "items" in data
+    assert len(data["items"]) == 5
+    assert "body" not in data["items"][0]
+    assert "slug" in data["items"][0]
+    assert "title" in data["items"][0]
+    assert "filters" in data
+    assert len(data["filters"]["categories"]) == 4
+    assert data["page"] == 1
+    assert data["total"] == 5
 
 
-def test_article_filters(client):
-    res = client.get("/api/v1/articles/filters")
+def test_list_articles_filter_by_category(client):
+    res = client.get("/api/v1/articles?category=brewery")
     assert res.status_code == 200
     data = res.json()
-    assert len(data) == 4
-    assert data[0]["key"] == "all"
+    assert all(a["category"] == "brewery" for a in data["items"])
+    assert data["total"] == 2
 
 
 def test_get_article_by_slug(client):
