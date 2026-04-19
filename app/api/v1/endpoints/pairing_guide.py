@@ -146,6 +146,19 @@ def get_pairing_guide():
     }
 
 
+@router.get("/pairing-guide/categories")
+def get_categories():
+    return [
+        {
+            "slug": cat["slug"],
+            "label": cat["label"],
+            "title": cat["title"],
+            "items": [_item_summary(item) for item in cat["items"]],
+        }
+        for cat in CATEGORIES
+    ]
+
+
 @router.get("/pairing-guide/items/{item_id}")
 def get_item(item_id: str):
     for item in _all_items():
