@@ -124,6 +124,49 @@ def _all_items():
     return [item for cat in CATEGORIES for item in cat["items"]]
 
 
+def _home_card(item: dict) -> dict:
+    return {
+        "id": item["id"],
+        "emoji": item["emoji"],
+        "food": item["foodName"],
+        "sake": item["sakeName"],
+        "temperature": item["temperature"],
+        "description": item["description"],
+    }
+
+
+@router.get("/home")
+def get_home():
+    all_items = _all_items()
+
+    seasonal_items = [item for item in all_items if item["season"] == "冬"][:3]
+    if len(seasonal_items) < 3:
+        seasonal_items = all_items[:3]
+
+    classic_items = [item for item in all_items if item["season"] == "通年"]
+    if len(classic_items) < 4:
+        seen = {item["id"] for item in classic_items}
+        for item in all_items:
+            if item["id"] not in seen:
+                classic_items.append(item)
+                if len(classic_items) >= 4:
+                    break
+    classic_items = classic_items[:4]
+
+    return {
+        "seasonal": {
+            "label": "WINTER COLLECTION",
+            "items": [_home_card(item) for item in seasonal_items],
+        },
+        "classic": {
+            "items": [_home_card(item) for item in classic_items],
+        },
+        "foodCategories": [
+            {"key": cat["slug"], "label": cat["label"]} for cat in CATEGORIES
+        ],
+    }
+
+
 @router.get("/pairing-guide")
 def get_pairing_guide():
     categories_summary = []
