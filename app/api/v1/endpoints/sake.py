@@ -3,6 +3,7 @@ from sqlmodel import Session, select
 
 from app.api.v1.schemas import paginate
 from app.core.database import get_session
+from app.core.persona_profile import distance, is_valid_code
 from app.models.sake import Flavor, Recipe, Sake, SakeFlavor, SakeRecipe
 
 router = APIRouter()
@@ -57,11 +58,21 @@ def _serialize_detail(
 def list_sake(
     page: int = 1,
     page_size: int = 20,
+    persona: str | None = None,
     session: Session = Depends(get_session),
 ):
-    sakes = session.exec(
-        select(Sake).order_by(Sake.created_at.asc(), Sake.id.asc())
-    ).all()
+    if persona is not None:
+        if not is_valid_code(persona):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid persona code '{persona}'. Expected 4 chars: [SD][HE][RL][BS].",
+            )
+        sakes = session.exec(select(Sake)).all()
+        sakes = sorted(sakes, key=lambda s: distance(s, persona))
+    else:
+        sakes = session.exec(
+            select(Sake).order_by(Sake.created_at.asc(), Sake.id.asc())
+        ).all()
     items = [_serialize_summary(s) for s in sakes]
     return paginate(items, page, page_size)
 

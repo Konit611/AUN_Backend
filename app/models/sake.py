@@ -17,7 +17,11 @@ class Sake(SQLModel, table=True):
     polishing: str
     serving_temperature: str
     serving_season: str
-    persona_code: str | None = Field(default=None, index=True)
+    sweetness: float = 0.5
+    umami: float = 0.5
+    acidity: float = 0.5
+    bitterness: float = 0.3
+    aroma: float = 0.5
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 

@@ -32,11 +32,14 @@ def upgrade() -> None:
         sa.Column('polishing', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column('serving_temperature', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column('serving_season', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column('persona_code', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column('sweetness', sa.Float(), nullable=False),
+        sa.Column('umami', sa.Float(), nullable=False),
+        sa.Column('acidity', sa.Float(), nullable=False),
+        sa.Column('bitterness', sa.Float(), nullable=False),
+        sa.Column('aroma', sa.Float(), nullable=False),
         sa.Column('created_at', sa.DateTime(), nullable=False),
         sa.PrimaryKeyConstraint('id'),
     )
-    op.create_index(op.f('ix_sake_persona_code'), 'sake', ['persona_code'], unique=False)
 
     op.create_table(
         'flavor',
@@ -148,5 +151,4 @@ def downgrade() -> None:
     op.drop_table('sake_flavor')
     op.drop_index(op.f('ix_flavor_label'), table_name='flavor')
     op.drop_table('flavor')
-    op.drop_index(op.f('ix_sake_persona_code'), table_name='sake')
     op.drop_table('sake')

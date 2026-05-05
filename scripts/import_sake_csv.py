@@ -42,6 +42,7 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 SAKE_REQUIRED = {
     "id", "name", "brewery", "region", "description", "type", "rice",
     "polishing", "serving_temperature", "serving_season",
+    "sweetness", "umami", "acidity", "bitterness", "aroma",
 }
 FLAVOR_REQUIRED = {"id", "label"}
 RECIPE_REQUIRED = {"id", "name", "emoji"}
@@ -88,6 +89,13 @@ def _upsert_sake(session: Session, rows: list[dict]) -> tuple[int, int]:
             raise SystemExit(
                 f"sake.csv row {line_no} (id={sake_id!r}) missing: {missing}"
             )
+        axes = {
+            "sweetness": float(_clean(row["sweetness"])),
+            "umami": float(_clean(row["umami"])),
+            "acidity": float(_clean(row["acidity"])),
+            "bitterness": float(_clean(row["bitterness"])),
+            "aroma": float(_clean(row["aroma"])),
+        }
         existing = session.get(Sake, sake_id)
         if existing:
             existing.name = _clean(row["name"])
@@ -99,7 +107,8 @@ def _upsert_sake(session: Session, rows: list[dict]) -> tuple[int, int]:
             existing.polishing = _clean(row["polishing"])
             existing.serving_temperature = _clean(row["serving_temperature"])
             existing.serving_season = _clean(row["serving_season"])
-            existing.persona_code = _optional(row.get("persona_code"))
+            for k, v in axes.items():
+                setattr(existing, k, v)
             session.add(existing)
             updated += 1
         else:
@@ -114,7 +123,7 @@ def _upsert_sake(session: Session, rows: list[dict]) -> tuple[int, int]:
                 polishing=_clean(row["polishing"]),
                 serving_temperature=_clean(row["serving_temperature"]),
                 serving_season=_clean(row["serving_season"]),
-                persona_code=_optional(row.get("persona_code")),
+                **axes,
             ))
             inserted += 1
     return inserted, updated
