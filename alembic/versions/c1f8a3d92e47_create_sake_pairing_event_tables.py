@@ -1,4 +1,4 @@
-"""create sake, pairing_guide, event tables
+"""create sake, flavor, recipe, pairing_guide, event tables
 
 Revision ID: c1f8a3d92e47
 Revises: daf951727416
@@ -39,30 +39,44 @@ def upgrade() -> None:
     op.create_index(op.f('ix_sake_persona_code'), 'sake', ['persona_code'], unique=False)
 
     op.create_table(
-        'sake_flavor_tag',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('sake_id', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        'flavor',
+        sa.Column('id', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
         sa.Column('label', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column('is_primary', sa.Boolean(), nullable=False),
-        sa.Column('position', sa.Integer(), nullable=False),
-        sa.ForeignKeyConstraint(['sake_id'], ['sake.id'], ),
         sa.PrimaryKeyConstraint('id'),
     )
-    op.create_index(op.f('ix_sake_flavor_tag_sake_id'), 'sake_flavor_tag', ['sake_id'], unique=False)
+    op.create_index(op.f('ix_flavor_label'), 'flavor', ['label'], unique=True)
 
     op.create_table(
-        'sake_pairing',
-        sa.Column('id', sa.Integer(), nullable=False),
+        'sake_flavor',
         sa.Column('sake_id', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column('emoji', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column('food_name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column('description', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
-        sa.Column('image_placeholder', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
+        sa.Column('flavor_id', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column('is_primary', sa.Boolean(), nullable=False),
         sa.Column('position', sa.Integer(), nullable=False),
+        sa.ForeignKeyConstraint(['flavor_id'], ['flavor.id'], ),
         sa.ForeignKeyConstraint(['sake_id'], ['sake.id'], ),
+        sa.PrimaryKeyConstraint('sake_id', 'flavor_id'),
+    )
+
+    op.create_table(
+        'recipe',
+        sa.Column('id', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column('name', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column('emoji', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column('image_placeholder', sqlmodel.sql.sqltypes.AutoString(), nullable=True),
         sa.PrimaryKeyConstraint('id'),
     )
-    op.create_index(op.f('ix_sake_pairing_sake_id'), 'sake_pairing', ['sake_id'], unique=False)
+    op.create_index(op.f('ix_recipe_name'), 'recipe', ['name'], unique=True)
+
+    op.create_table(
+        'sake_recipe',
+        sa.Column('sake_id', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column('recipe_id', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column('description', sqlmodel.sql.sqltypes.AutoString(), nullable=False),
+        sa.Column('position', sa.Integer(), nullable=False),
+        sa.ForeignKeyConstraint(['recipe_id'], ['recipe.id'], ),
+        sa.ForeignKeyConstraint(['sake_id'], ['sake.id'], ),
+        sa.PrimaryKeyConstraint('sake_id', 'recipe_id'),
+    )
 
     op.create_table(
         'event',
@@ -128,9 +142,11 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_pairing_category_slug'), table_name='pairing_category')
     op.drop_table('pairing_category')
     op.drop_table('event')
-    op.drop_index(op.f('ix_sake_pairing_sake_id'), table_name='sake_pairing')
-    op.drop_table('sake_pairing')
-    op.drop_index(op.f('ix_sake_flavor_tag_sake_id'), table_name='sake_flavor_tag')
-    op.drop_table('sake_flavor_tag')
+    op.drop_table('sake_recipe')
+    op.drop_index(op.f('ix_recipe_name'), table_name='recipe')
+    op.drop_table('recipe')
+    op.drop_table('sake_flavor')
+    op.drop_index(op.f('ix_flavor_label'), table_name='flavor')
+    op.drop_table('flavor')
     op.drop_index(op.f('ix_sake_persona_code'), table_name='sake')
     op.drop_table('sake')

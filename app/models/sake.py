@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 
 from sqlmodel import Field, SQLModel
@@ -20,23 +21,41 @@ class Sake(SQLModel, table=True):
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
-class SakeFlavorTag(SQLModel, table=True):
-    __tablename__ = "sake_flavor_tag"
+class Flavor(SQLModel, table=True):
+    __tablename__ = "flavor"
 
-    id: int | None = Field(default=None, primary_key=True)
-    sake_id: str = Field(foreign_key="sake.id", index=True)
-    label: str
+    id: str = Field(
+        default_factory=lambda: str(uuid.uuid4()),
+        primary_key=True,
+    )
+    label: str = Field(unique=True, index=True)
+
+
+class SakeFlavor(SQLModel, table=True):
+    __tablename__ = "sake_flavor"
+
+    sake_id: str = Field(foreign_key="sake.id", primary_key=True)
+    flavor_id: str = Field(foreign_key="flavor.id", primary_key=True)
     is_primary: bool = False
     position: int = 0
 
 
-class SakePairing(SQLModel, table=True):
-    __tablename__ = "sake_pairing"
+class Recipe(SQLModel, table=True):
+    __tablename__ = "recipe"
 
-    id: int | None = Field(default=None, primary_key=True)
-    sake_id: str = Field(foreign_key="sake.id", index=True)
+    id: str = Field(
+        default_factory=lambda: str(uuid.uuid4()),
+        primary_key=True,
+    )
+    name: str = Field(unique=True, index=True)
     emoji: str
-    food_name: str
-    description: str
     image_placeholder: str | None = None
+
+
+class SakeRecipe(SQLModel, table=True):
+    __tablename__ = "sake_recipe"
+
+    sake_id: str = Field(foreign_key="sake.id", primary_key=True)
+    recipe_id: str = Field(foreign_key="recipe.id", primary_key=True)
+    description: str
     position: int = 0

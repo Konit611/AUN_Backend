@@ -1,24 +1,14 @@
-"""Seed sake / pairing_guide / event tables with 5 verification rows.  # noqa: D205
+"""Seed pairing_category and pairing_item tables.
 
-Runs as a script (`python scripts/seed_sake.py`); the sys.path patch below
-adds the project root so `from app...` resolves.
-
-Selected for schema-shape verification (geographic + type diversity):
-  - dassai-45         (山口県, 純米大吟醸,    fruity)
-  - kubota-manju      (新潟県, 純米大吟醸,    mellow)
-  - denshu-tokubetsu  (青森県, 特別純米,      umami)
-  - aramasa-no6       (秋田県, 純米,          modern/sour)
-  - nabeshima-newmoon (佐賀県, 純米吟醸,      juicy)
+Sake / flavor / recipe seeding has moved to scripts/import_sake_csv.py
+(it reads the canonical CSVs in `aun_back/data/`). This script now only
+seeds the pairing_guide tables.
 
 Run inside the backend container:
     docker compose exec backend uv run python scripts/seed_sake.py
 
-Idempotent: skips rows whose primary key (sake.id, pairing_item.id, or
-pairing_category.slug) already exists.
-
-Note: persona_code is intentionally left NULL — the founder must hand-curate
-the persona-to-sake mapping. This is the core curation judgment that should
-not be auto-generated. See docs/01_제품_설계서.md.
+Idempotent: skips rows whose primary key (pairing_category.slug or
+pairing_item.id) already exists.
 """
 
 import sys
@@ -30,126 +20,6 @@ from sqlmodel import Session, select
 
 from app.core.database import engine
 from app.models.pairing_guide import PairingCategory, PairingItem
-from app.models.sake import Sake, SakeFlavorTag, SakePairing
-
-
-SAKES: list[dict] = [
-    {
-        "id": "dassai-45",
-        "name": "獺祭 純米大吟醸45",
-        "brewery": "旭酒造",
-        "region": "山口県",
-        "description": "最高の「普通」を目指した、旭酒造のスタンダード。磨き45%の贅沢な造りでありながら、日常に寄り添う親しみやすさと、果実のような華やかな香りが調和した一品です。",
-        "type": "純米大吟醸",
-        "rice": "山田錦",
-        "polishing": "45%",
-        "serving_temperature": "冷酒 5-10°C",
-        "serving_season": "通年",
-        "flavor_tags": [
-            {"label": "フルーティー", "is_primary": True},
-            {"label": "華やか", "is_primary": True},
-            {"label": "軽い", "is_primary": False},
-            {"label": "甘口", "is_primary": False},
-        ],
-        "pairings": [
-            {"emoji": "🍢", "food_name": "焼き鳥（タレ）", "description": "甘辛いタレのコクが、獺祭のフルーティーな甘みと絶妙に引き立て合います。", "image_placeholder": "yakitori"},
-            {"emoji": "🐟", "food_name": "旬の刺身", "description": "白身魚や帆立など、繊細な甘みを持つ魚介との相性は抜群です。", "image_placeholder": "sashimi"},
-            {"emoji": "🧀", "food_name": "カマンベール", "description": "クリーミーなチーズの質感が、大吟醸の滑らかな口当たりと優雅に重なります。", "image_placeholder": "cheese"},
-        ],
-    },
-    {
-        "id": "kubota-manju",
-        "name": "久保田 萬寿",
-        "brewery": "朝日酒造",
-        "region": "新潟県",
-        "description": "朝日酒造の最高峰。越淡麗を50%まで磨き上げ、柔らかく深い味わいと、上品な香りが織りなす格調高い一杯。特別な日にふさわしい贅沢な純米大吟醸です。",
-        "type": "純米大吟醸",
-        "rice": "越淡麗",
-        "polishing": "50%",
-        "serving_temperature": "冷酒 5-10°C",
-        "serving_season": "通年",
-        "flavor_tags": [
-            {"label": "まろやか", "is_primary": True},
-            {"label": "上品", "is_primary": True},
-            {"label": "コクがある", "is_primary": False},
-            {"label": "辛口", "is_primary": False},
-        ],
-        "pairings": [
-            {"emoji": "🍢", "food_name": "焼き鳥（タレ）", "description": "萬寿のまろやかなコクが、タレの甘辛さを包み込み、何本でも進む心地よさ。", "image_placeholder": "yakitori"},
-            {"emoji": "🐟", "food_name": "昆布締め", "description": "昆布の旨味と萬寿のふくよかな味わいが、静かに重なり合う上質な組み合わせ。", "image_placeholder": "kobujime"},
-            {"emoji": "🍲", "food_name": "湯豆腐", "description": "素材の繊細な味わいを、萬寿の柔らかな旨味が引き立てます。", "image_placeholder": "yudofu"},
-        ],
-    },
-    {
-        "id": "denshu-tokubetsu",
-        "name": "田酒 特別純米",
-        "brewery": "西田酒造店",
-        "region": "青森県",
-        "description": "田の酒、と名付けられた通り、米の旨味を最大限に引き出した骨太な純米酒。しっかりとした味わいながら、後味はすっきり。燗にすると更に旨味が広がります。",
-        "type": "特別純米",
-        "rice": "華吹雪",
-        "polishing": "55%",
-        "serving_temperature": "ぬる燗 40°C",
-        "serving_season": "冬",
-        "flavor_tags": [
-            {"label": "米の旨味", "is_primary": True},
-            {"label": "骨太", "is_primary": True},
-            {"label": "辛口", "is_primary": False},
-            {"label": "燗上がり", "is_primary": False},
-        ],
-        "pairings": [
-            {"emoji": "🫕", "food_name": "もつ鍋", "description": "濃厚なもつの旨味を、田酒のしっかりした米の味わいが受け止めます。", "image_placeholder": "motsunabe"},
-            {"emoji": "🐟", "food_name": "ぶりの照り焼き", "description": "脂の乗ったぶりと、燗にした田酒のコクが絶妙にマッチ。", "image_placeholder": "buri-teriyaki"},
-            {"emoji": "🍢", "food_name": "焼きおにぎり", "description": "香ばしい味噌の風味と、米の旨味同士が共鳴する素朴な幸せ。", "image_placeholder": "yaki-onigiri"},
-        ],
-    },
-    {
-        "id": "aramasa-no6",
-        "name": "新政 No.6 S-type",
-        "brewery": "新政酒造",
-        "region": "秋田県",
-        "description": "6号酵母発祥の蔵が醸す、革新的な純米酒。シャープな酸味と白ぶどうのような香り、微かな乳酸のニュアンス。ワイン好きも唸らせる個性派です。",
-        "type": "純米",
-        "rice": "秋田酒こまち",
-        "polishing": "55%",
-        "serving_temperature": "冷酒 8°C",
-        "serving_season": "通年",
-        "flavor_tags": [
-            {"label": "酸味", "is_primary": True},
-            {"label": "モダン", "is_primary": True},
-            {"label": "軽い", "is_primary": False},
-            {"label": "ドライ", "is_primary": False},
-        ],
-        "pairings": [
-            {"emoji": "🦪", "food_name": "牡蠣のポン酢", "description": "新政の酸味が牡蠣のミネラル感と共鳴し、レモンを絞ったような爽快さ。", "image_placeholder": "kaki-ponzu"},
-            {"emoji": "🧀", "food_name": "シェーヴルチーズ", "description": "ヤギのチーズの酸味と新政の乳酸が、フランス的なマリアージュを生みます。", "image_placeholder": "chevre"},
-            {"emoji": "🐟", "food_name": "カルパッチョ", "description": "オリーブオイルと柑橘の白身魚に、新政のシャープさが映えます。", "image_placeholder": "carpaccio"},
-        ],
-    },
-    {
-        "id": "nabeshima-newmoon",
-        "name": "鍋島 New Moon",
-        "brewery": "富久千代酒造",
-        "region": "佐賀県",
-        "description": "IWC（インターナショナル・ワイン・チャレンジ）で頂点に輝いた実力派。ジューシーな果実味と微かな発泡感が、新しい日本酒体験を届けてくれます。",
-        "type": "純米吟醸",
-        "rice": "山田錦",
-        "polishing": "50%",
-        "serving_temperature": "冷酒 5°C",
-        "serving_season": "春・夏",
-        "flavor_tags": [
-            {"label": "ジューシー", "is_primary": True},
-            {"label": "フレッシュ", "is_primary": True},
-            {"label": "甘口", "is_primary": False},
-            {"label": "発泡感", "is_primary": False},
-        ],
-        "pairings": [
-            {"emoji": "🥗", "food_name": "生春巻き", "description": "フレッシュな野菜と海老に、鍋島の果実味が爽やかに寄り添います。", "image_placeholder": "namaharumaki"},
-            {"emoji": "🧀", "food_name": "モッツァレラとトマト", "description": "カプレーゼの酸味と鍋島のジューシーさが、イタリアンな相性。", "image_placeholder": "caprese"},
-            {"emoji": "🍓", "food_name": "フルーツタルト", "description": "デザートとの意外な組み合わせ。果実味同士が華やかに響き合います。", "image_placeholder": "fruit-tart"},
-        ],
-    },
-]
 
 
 CATEGORIES: list[dict] = [
@@ -159,7 +29,7 @@ CATEGORIES: list[dict] = [
 ]
 
 
-# sake_id is set only when the referenced sake exists in SAKES above (FK).
+# sake_id is set only when the referenced sake exists in the sake table (FK).
 # Otherwise None — the pairing_item still has sake_name/brewery as text.
 ITEMS: list[dict] = [
     {
@@ -260,23 +130,6 @@ ITEMS: list[dict] = [
 ]
 
 
-def seed_sakes(session: Session) -> int:
-    inserted = 0
-    for data in SAKES:
-        if session.get(Sake, data["id"]):
-            continue
-        sake_kwargs = {
-            k: v for k, v in data.items() if k not in ("flavor_tags", "pairings")
-        }
-        session.add(Sake(**sake_kwargs))
-        for i, tag in enumerate(data["flavor_tags"]):
-            session.add(SakeFlavorTag(sake_id=data["id"], position=i, **tag))
-        for i, pairing in enumerate(data["pairings"]):
-            session.add(SakePairing(sake_id=data["id"], position=i, **pairing))
-        inserted += 1
-    return inserted
-
-
 def seed_categories(session: Session) -> int:
     inserted = 0
     for data in CATEGORIES:
@@ -311,14 +164,11 @@ def seed_items(session: Session) -> int:
 
 def main() -> None:
     with Session(engine) as session:
-        n_sakes = seed_sakes(session)
         n_cats = seed_categories(session)
         session.commit()  # commit categories so seed_items can resolve their IDs
         n_items = seed_items(session)
         session.commit()
-        print(
-            f"Seeded sakes={n_sakes} categories={n_cats} pairing_items={n_items}"
-        )
+        print(f"Seeded categories={n_cats} pairing_items={n_items}")
 
 
 if __name__ == "__main__":

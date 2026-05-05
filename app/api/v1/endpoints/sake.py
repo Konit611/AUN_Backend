@@ -3,7 +3,7 @@ from sqlmodel import Session, select
 
 from app.api.v1.schemas import paginate
 from app.core.database import get_session
-from app.models.sake import Sake, SakeFlavorTag, SakePairing
+from app.models.sake import Flavor, Recipe, Sake, SakeFlavor, SakeRecipe
 
 router = APIRouter()
 
@@ -24,8 +24,8 @@ def _serialize_summary(sake: Sake) -> dict:
 
 def _serialize_detail(
     sake: Sake,
-    flavor_tags: list[SakeFlavorTag],
-    pairings: list[SakePairing],
+    flavor_rows: list[tuple[SakeFlavor, Flavor]],
+    pairing_rows: list[tuple[SakeRecipe, Recipe]],
 ) -> dict:
     return {
         "id": sake.id,
@@ -37,17 +37,18 @@ def _serialize_detail(
         "rice": sake.rice,
         "polishing": sake.polishing,
         "flavorTags": [
-            {"label": t.label, "primary": t.is_primary} for t in flavor_tags
+            {"label": flavor.label, "primary": link.is_primary}
+            for link, flavor in flavor_rows
         ],
         "servingTags": _serving_tags(sake),
         "pairings": [
             {
-                "emoji": p.emoji,
-                "foodName": p.food_name,
-                "description": p.description,
-                "imagePlaceholder": p.image_placeholder or "",
+                "emoji": recipe.emoji,
+                "foodName": recipe.name,
+                "description": link.description,
+                "imagePlaceholder": recipe.image_placeholder or "",
             }
-            for p in pairings
+            for link, recipe in pairing_rows
         ],
     }
 
@@ -71,14 +72,16 @@ def get_sake(sake_id: str, session: Session = Depends(get_session)):
     if not sake:
         raise HTTPException(status_code=404, detail=f"Sake '{sake_id}' not found")
 
-    flavor_tags = session.exec(
-        select(SakeFlavorTag)
-        .where(SakeFlavorTag.sake_id == sake_id)
-        .order_by(SakeFlavorTag.position.asc())
+    flavor_rows = session.exec(
+        select(SakeFlavor, Flavor)
+        .join(Flavor, SakeFlavor.flavor_id == Flavor.id)
+        .where(SakeFlavor.sake_id == sake_id)
+        .order_by(SakeFlavor.position.asc())
     ).all()
-    pairings = session.exec(
-        select(SakePairing)
-        .where(SakePairing.sake_id == sake_id)
-        .order_by(SakePairing.position.asc())
+    pairing_rows = session.exec(
+        select(SakeRecipe, Recipe)
+        .join(Recipe, SakeRecipe.recipe_id == Recipe.id)
+        .where(SakeRecipe.sake_id == sake_id)
+        .order_by(SakeRecipe.position.asc())
     ).all()
-    return _serialize_detail(sake, flavor_tags, pairings)
+    return _serialize_detail(sake, flavor_rows, pairing_rows)
