@@ -8,6 +8,7 @@ from app.api.v1.endpoints import (
     auth,
     pairing_guide,
     sake,
+    sakana,
     quiz_results,
     journal,
 )
@@ -18,6 +19,7 @@ router.include_router(auth.router)
 router.include_router(articles.router, prefix="", tags=["articles"])
 router.include_router(pairing_guide.router, prefix="", tags=["pairing-guide"])
 router.include_router(sake.router, prefix="", tags=["sake"])
+router.include_router(sakana.router, prefix="", tags=["sakana"])
 router.include_router(quiz_results.router, prefix="", tags=["quiz-results"])
 router.include_router(journal.router, prefix="", tags=["journal"])
 router.include_router(admin_sakana.router)
