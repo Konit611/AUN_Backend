@@ -26,6 +26,7 @@ def _serialize_summary(sake: Sake) -> dict:
 
 def _serialize_pairing(sakana: Sakana, description: str = "") -> dict:
     return {
+        "sakanaId": sakana.id,
         "emoji": sakana.emoji,
         "foodName": sakana.name,
         "description": description,
