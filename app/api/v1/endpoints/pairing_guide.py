@@ -1,110 +1,17 @@
-from fastapi import APIRouter, HTTPException
+"""Pairing guide endpoints — joins pairing_item with sake + recipe.
+
+Items reference Sake (sake_id) and Recipe (recipe_id) as required FKs,
+so display data (food name, sake name, images) is always derived from
+the canonical entities. Admin UI manages these via /api/v1/admin/pairings.
+"""
+from fastapi import APIRouter, Depends, HTTPException
+from sqlmodel import Session, select
+
+from app.core.database import get_session
+from app.models.pairing_guide import PairingCategory, PairingItem
+from app.models.sake import Recipe, Sake
 
 router = APIRouter()
-
-CATEGORIES = [
-    {
-        "slug": "grilled",
-        "label": "焼き物",
-        "title": "焼き物のペアリング",
-        "items": [
-            {
-                "id": "grilled-1",
-                "emoji": "🍢",
-                "foodName": "焼き鳥（タレ）",
-                "sakeName": "久保田 萬寿",
-                "sakeBrewery": "朝日酒造（新潟県）",
-                "sakeType": "純米大吟醸",
-                "temperature": "冷酒 5-10°C",
-                "season": "冬",
-                "description": "芳醇なコクのあるタレには、同じく深みのある萬寿を。甘辛い醤油の風味と、酒のまろやかな旨味が口の中で静かに重なり合います。",
-                "body": "居酒屋の定番、焼き鳥のタレ。その甘辛い醤油ダレの奥深い味わいに、久保田 萬寿のふくよかなコクが寄り添います。萬寿の持つ柔らかな甘みと旨味が、タレの焦がし醤油の香ばしさと重なり合い、口の中で豊かなハーモニーを奏でます。",
-                "whyItWorks": "タレの甘辛さは、酒の旨味成分と共鳴しやすい。萬寿のまろやかなコクがタレの味わいを包み込み、脂の後味を優しく流してくれるため、何本でも食べ進められる心地よさが生まれます。",
-                "howToEnjoy": "焼き鳥は焼きたてが命。まずはタレをひと口、次に萬寿を含んで味わいの変化を楽しんでください。5〜10°Cに冷やすと、キレが出てタレの濃さとバランスが取れます。",
-                "foodImage": "/images/pairing/yakitori-tare.jpg",
-                "sakeImage": "/images/pairing/kubota-manju.jpg",
-            },
-            {
-                "id": "grilled-2",
-                "emoji": "🐟",
-                "foodName": "塩焼き（鮭・鯖）",
-                "sakeName": "八海山 特別本醸造",
-                "sakeBrewery": "八海醸造（新潟県）",
-                "sakeType": "特別本醸造",
-                "temperature": "常温 15-20°C",
-                "season": "通年",
-                "description": "魚の脂をさっぱりと流す、キレのある辛口。素材本来の味を引き立てるこの組み合わせは、毎日の夕食を格上げする究極の定番です。",
-                "body": "塩だけで焼き上げた鮭や鯖。素材そのものの旨味が凝縮された一品に合わせるのは、八海山の特別本醸造。すっきりとした辛口でありながら、米の旨味がしっかり感じられるバランスの良さが、魚の持ち味を引き出します。",
-                "whyItWorks": "塩焼きの魚は脂と塩味のシンプルな構成。八海山のキレのある酸味が脂をさっぱりと流し、次のひと口への食欲を呼び起こします。常温にすることで酒の旨味が広がり、魚の脂との調和がより深まります。",
-                "howToEnjoy": "焼き上がりに大根おろしとレモンを添えて。常温の八海山と交互にいただくと、魚の旨味が口の中でじんわり広がります。毎日の晩酌の定番にしたいペアリングです。",
-                "foodImage": "/images/pairing/shioyaki-salmon.jpg",
-                "sakeImage": "/images/pairing/hakkaisan.jpg",
-            },
-            {
-                "id": "grilled-3",
-                "emoji": "🥩",
-                "foodName": "牛の炙り焼き",
-                "sakeName": "獺祭 純米大吟醸 磨き三割九分",
-                "sakeBrewery": "旭酒造（山口県）",
-                "sakeType": "純米大吟醸",
-                "temperature": "ぬる燗 40°C",
-                "season": "冬",
-                "description": "和牛の甘みのある脂には、華やかな香りの獺祭を。少し温めることで酒の甘みが膨らみ、肉の濃厚な旨味と美しく調和します。",
-                "body": "炭火で炙った和牛の芳醇な香りと、獺祭 磨き三割九分の華やかな吟醸香。一見意外な組み合わせですが、和牛の甘みのある脂と獺祭のフルーティーな甘みは、驚くほど自然に調和します。",
-                "whyItWorks": "和牛の脂は甘みが特徴。獺祭をぬる燗にすることで酒の甘みと旨味が膨らみ、肉の脂の甘みと同調します。香りの複雑さが加わることで、単なる「肉と酒」を超えた上質な食体験になります。",
-                "howToEnjoy": "肉は表面だけ炙って、中はレアに。獺祭は40°C前後のぬる燗で。肉をひと切れ口に入れ、脂が溶け始めたところで酒を含むと、口の中で味わいが花開きます。",
-                "foodImage": "/images/pairing/wagyu-aburi.jpg",
-                "sakeImage": "/images/pairing/dassai.jpg",
-            },
-        ],
-    },
-    {
-        "slug": "sashimi",
-        "label": "刺身",
-        "title": "刺身のペアリング",
-        "items": [
-            {
-                "id": "sashimi-1",
-                "emoji": "🐟",
-                "foodName": "まぐろの赤身",
-                "sakeName": "十四代 本丸",
-                "sakeBrewery": "高木酒造（山形県）",
-                "sakeType": "本醸造",
-                "temperature": "冷酒 8-12°C",
-                "season": "通年",
-                "description": "まぐろの鉄分を含んだ旨味に、十四代のフルーティーな甘みがマッチ。赤身の力強さを優雅に包み込みます。",
-                "body": "まぐろの赤身は、鉄分を含んだ独特の旨味と適度な酸味が魅力。その力強い味わいに、十四代 本丸のフルーティーで華やかな香りが優しく寄り添います。幻の酒と呼ばれる十四代の、親しみやすい本丸だからこそ実現する日常の贅沢です。",
-                "whyItWorks": "赤身の鉄分は、酒の甘みと合わせることで角が取れ、旨味が引き立ちます。十四代の果実的な香りがまぐろの生臭さを包み込み、後味を爽やかにまとめます。",
-                "howToEnjoy": "赤身は薄めに切り、少量の醤油で。十四代は8〜12°Cに冷やして、赤身を口に含んだ直後に酒をひと口。鮮度の良い赤身であるほど、このペアリングの真価が発揮されます。",
-                "foodImage": "/images/pairing/maguro.jpg",
-                "sakeImage": "/images/pairing/juyondai.jpg",
-            },
-        ],
-    },
-    {
-        "slug": "nabe",
-        "label": "鍋物",
-        "title": "鍋物のペアリング",
-        "items": [
-            {
-                "id": "nabe-1",
-                "emoji": "🫕",
-                "foodName": "もつ鍋",
-                "sakeName": "田酒 特別純米",
-                "sakeBrewery": "西田酒造店（青森県）",
-                "sakeType": "特別純米",
-                "temperature": "ぬる燗 40°C",
-                "season": "冬",
-                "description": "濃厚なもつの旨味を、田酒のしっかりとした米の味わいが受け止めます。温めた酒が体を芯から温めてくれます。",
-                "body": "博多名物のもつ鍋。ぷりぷりのもつから溶け出す濃厚な旨味と、醤油ベースのスープの深い味わい。そこに田酒の特別純米を合わせると、米の旨味がスープの奥行きと呼応し、体の芯から温まる至福の時間が訪れます。",
-                "whyItWorks": "もつの脂とコラーゲンは、温めた酒の旨味成分と絶妙に調和します。田酒のしっかりとした米の味わいが、濃厚なスープに負けることなく、むしろ互いの旨味を増幅させます。",
-                "howToEnjoy": "鍋が煮立ったら、まずスープをひと口。続いて田酒をぬる燗で。もつを食べた後の口の中に残る脂を、酒がすっと流してくれます。〆のちゃんぽん麺と一緒に最後の一杯を。",
-                "foodImage": "/images/pairing/motsunabe.jpg",
-                "sakeImage": "/images/pairing/denshu.jpg",
-            },
-        ],
-    },
-]
 
 SEASON_FILTERS = [
     {"key": "all", "label": "すべて"},
@@ -113,75 +20,125 @@ SEASON_FILTERS = [
     {"key": "year-round", "label": "通年", "match": "通年"},
 ]
 
-DETAIL_ONLY_FIELDS = {"body", "whyItWorks", "howToEnjoy"}
 
-
-def _item_summary(item: dict) -> dict:
-    return {k: v for k, v in item.items() if k not in DETAIL_ONLY_FIELDS}
-
-
-def _all_items():
-    return [item for cat in CATEGORIES for item in cat["items"]]
-
-
-def _home_card(item: dict) -> dict:
+def _summary(item: PairingItem, sake: Sake, recipe: Recipe) -> dict:
     return {
-        "id": item["id"],
-        "emoji": item["emoji"],
-        "food": item["foodName"],
-        "sake": item["sakeName"],
-        "temperature": item["temperature"],
-        "description": item["description"],
+        "id": item.id,
+        "emoji": recipe.emoji,
+        "foodName": recipe.name,
+        "sakeName": sake.name,
+        "sakeBrewery": sake.brewery,
+        "sakeType": sake.type,
+        "temperature": item.temperature,
+        "season": item.season,
+        "description": item.description,
+        "foodImage": recipe.food_image_url,
+        "sakeImage": sake.image_url,
+        "heroImage": item.hero_image,
     }
 
 
+def _detail(item: PairingItem, sake: Sake, recipe: Recipe) -> dict:
+    return {
+        **_summary(item, sake, recipe),
+        "body": item.body,
+        "whyItWorks": item.why_it_works,
+        "howToEnjoy": item.how_to_enjoy,
+    }
+
+
+def _home_card(item: PairingItem, sake: Sake, recipe: Recipe) -> dict:
+    return {
+        "id": item.id,
+        "emoji": recipe.emoji,
+        "food": recipe.name,
+        "sake": sake.name,
+        "temperature": item.temperature,
+        "description": item.description,
+    }
+
+
+def _resolve_one(
+    session: Session, item: PairingItem
+) -> tuple[PairingItem, Sake, Recipe] | None:
+    sake = session.get(Sake, item.sake_id)
+    recipe = session.get(Recipe, item.recipe_id)
+    if not sake or not recipe:
+        return None
+    return item, sake, recipe
+
+
+def _resolve_many(
+    session: Session, items: list[PairingItem]
+) -> list[tuple[PairingItem, Sake, Recipe]]:
+    out = []
+    for it in items:
+        triple = _resolve_one(session, it)
+        if triple:
+            out.append(triple)
+    return out
+
+
 @router.get("/home")
-def get_home():
-    all_items = _all_items()
+def get_home(session: Session = Depends(get_session)):
+    items = session.exec(
+        select(PairingItem).order_by(PairingItem.position.asc())
+    ).all()
+    resolved = _resolve_many(session, items)
 
-    seasonal_items = [item for item in all_items if item["season"] == "冬"][:3]
-    if len(seasonal_items) < 3:
-        seasonal_items = all_items[:3]
+    seasonal = [t for t in resolved if t[0].season == "冬"][:3]
+    if len(seasonal) < 3:
+        seasonal = resolved[:3]
 
-    classic_items = [item for item in all_items if item["season"] == "通年"]
-    if len(classic_items) < 4:
-        seen = {item["id"] for item in classic_items}
-        for item in all_items:
-            if item["id"] not in seen:
-                classic_items.append(item)
-                if len(classic_items) >= 4:
+    classic = [t for t in resolved if t[0].season == "通年"]
+    if len(classic) < 4:
+        seen = {t[0].id for t in classic}
+        for t in resolved:
+            if t[0].id not in seen:
+                classic.append(t)
+                if len(classic) >= 4:
                     break
-    classic_items = classic_items[:4]
+    classic = classic[:4]
+
+    cats = session.exec(
+        select(PairingCategory).order_by(PairingCategory.position.asc())
+    ).all()
 
     return {
         "seasonal": {
             "label": "WINTER COLLECTION",
-            "items": [_home_card(item) for item in seasonal_items],
+            "items": [_home_card(*t) for t in seasonal],
         },
         "classic": {
-            "items": [_home_card(item) for item in classic_items],
+            "items": [_home_card(*t) for t in classic],
         },
-        "foodCategories": [
-            {"key": cat["slug"], "label": cat["label"]} for cat in CATEGORIES
-        ],
+        "foodCategories": [{"key": c.slug, "label": c.label} for c in cats],
     }
 
 
 @router.get("/pairing-guide")
-def get_pairing_guide():
-    categories_summary = []
-    for cat in CATEGORIES:
-        categories_summary.append({
-            "slug": cat["slug"],
-            "label": cat["label"],
-            "title": cat["title"],
-            "items": [_item_summary(item) for item in cat["items"]],
+def get_pairing_guide(session: Session = Depends(get_session)):
+    cats = session.exec(
+        select(PairingCategory).order_by(PairingCategory.position.asc())
+    ).all()
+    out_categories = []
+    for cat in cats:
+        items = session.exec(
+            select(PairingItem)
+            .where(PairingItem.category_id == cat.id)
+            .order_by(PairingItem.position.asc())
+        ).all()
+        resolved = _resolve_many(session, items)
+        out_categories.append({
+            "slug": cat.slug,
+            "label": cat.label,
+            "title": cat.title,
+            "items": [_summary(*t) for t in resolved],
         })
 
-    food_filters = [{"key": cat["slug"], "label": cat["label"]} for cat in CATEGORIES]
-
+    food_filters = [{"key": c.slug, "label": c.label} for c in cats]
     return {
-        "categories": categories_summary,
+        "categories": out_categories,
         "filters": {
             "seasons": SEASON_FILTERS,
             "foodCategories": food_filters,
@@ -190,21 +147,38 @@ def get_pairing_guide():
 
 
 @router.get("/pairing-guide/categories")
-def get_categories():
-    return [
-        {
-            "slug": cat["slug"],
-            "label": cat["label"],
-            "title": cat["title"],
-            "items": [_item_summary(item) for item in cat["items"]],
-        }
-        for cat in CATEGORIES
-    ]
+def get_categories(session: Session = Depends(get_session)):
+    cats = session.exec(
+        select(PairingCategory).order_by(PairingCategory.position.asc())
+    ).all()
+    out = []
+    for cat in cats:
+        items = session.exec(
+            select(PairingItem)
+            .where(PairingItem.category_id == cat.id)
+            .order_by(PairingItem.position.asc())
+        ).all()
+        resolved = _resolve_many(session, items)
+        out.append({
+            "slug": cat.slug,
+            "label": cat.label,
+            "title": cat.title,
+            "items": [_summary(*t) for t in resolved],
+        })
+    return out
 
 
 @router.get("/pairing-guide/items/{item_id}")
-def get_item(item_id: str):
-    for item in _all_items():
-        if item["id"] == item_id:
-            return item
-    raise HTTPException(status_code=404, detail=f"Pairing item '{item_id}' not found")
+def get_item(item_id: str, session: Session = Depends(get_session)):
+    item = session.get(PairingItem, item_id)
+    if not item:
+        raise HTTPException(
+            status_code=404, detail=f"Pairing item '{item_id}' not found"
+        )
+    triple = _resolve_one(session, item)
+    if not triple:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Pairing item '{item_id}' references missing sake/recipe",
+        )
+    return _detail(*triple)

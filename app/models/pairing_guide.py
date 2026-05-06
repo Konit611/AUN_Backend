@@ -16,20 +16,15 @@ class PairingItem(SQLModel, table=True):
 
     id: str = Field(primary_key=True)
     category_id: int = Field(foreign_key="pairing_category.id", index=True)
-    emoji: str
-    food_name: str
-    sake_name: str
-    sake_brewery: str
-    sake_type: str
+    sake_id: str = Field(foreign_key="sake.id", index=True)
+    recipe_id: str = Field(foreign_key="recipe.id", index=True)
     temperature: str
     season: str
     description: str
     body: str
     why_it_works: str
     how_to_enjoy: str
-    food_image: str | None = None
-    sake_image: str | None = None
-    sake_id: str | None = Field(default=None, foreign_key="sake.id", index=True)
+    hero_image: str | None = None
     event_id: int | None = Field(default=None, foreign_key="event.id", index=True)
     persona_code: str | None = Field(default=None, index=True)
     position: int = 0
