@@ -44,6 +44,7 @@ def _detail(item: PairingItem, sake: Sake, sakana: Sakana) -> dict:
         "body": item.body,
         "whyItWorks": item.why_it_works,
         "howToEnjoy": item.how_to_enjoy,
+        "bodyHtml": item.body_html,
     }
 
 
@@ -82,7 +83,9 @@ def _resolve_many(
 @router.get("/home")
 def get_home(session: Session = Depends(get_session)):
     items = session.exec(
-        select(PairingItem).order_by(PairingItem.position.asc())
+        select(PairingItem)
+        .where(PairingItem.is_draft.is_(False))
+        .order_by(PairingItem.position.asc())
     ).all()
     resolved = _resolve_many(session, items)
 
@@ -125,7 +128,10 @@ def get_pairing_guide(session: Session = Depends(get_session)):
     for cat in cats:
         items = session.exec(
             select(PairingItem)
-            .where(PairingItem.category_id == cat.id)
+            .where(
+                PairingItem.category_id == cat.id,
+                PairingItem.is_draft.is_(False),
+            )
             .order_by(PairingItem.position.asc())
         ).all()
         resolved = _resolve_many(session, items)
@@ -155,7 +161,10 @@ def get_categories(session: Session = Depends(get_session)):
     for cat in cats:
         items = session.exec(
             select(PairingItem)
-            .where(PairingItem.category_id == cat.id)
+            .where(
+                PairingItem.category_id == cat.id,
+                PairingItem.is_draft.is_(False),
+            )
             .order_by(PairingItem.position.asc())
         ).all()
         resolved = _resolve_many(session, items)
@@ -171,7 +180,7 @@ def get_categories(session: Session = Depends(get_session)):
 @router.get("/pairing-guide/items/{item_id}")
 def get_item(item_id: str, session: Session = Depends(get_session)):
     item = session.get(PairingItem, item_id)
-    if not item:
+    if not item or item.is_draft:
         raise HTTPException(
             status_code=404, detail=f"Pairing item '{item_id}' not found"
         )

@@ -32,7 +32,11 @@ def _serialize_summary(article: Article, category: ArticleCategory) -> dict:
 
 
 def _serialize_detail(article: Article, category: ArticleCategory) -> dict:
-    return {**_serialize_summary(article, category), "body": article.body}
+    return {
+        **_serialize_summary(article, category),
+        "body": article.body,
+        "bodyHtml": article.body_html,
+    }
 
 
 def _category_filters(session: Session) -> list[dict]:
@@ -61,12 +65,14 @@ def list_articles(
         else:
             articles = session.exec(
                 select(Article)
-                .where(Article.category_id == cat.id)
+                .where(Article.category_id == cat.id, Article.is_draft.is_(False))
                 .order_by(Article.date.desc())
             ).all()
     else:
         articles = session.exec(
-            select(Article).order_by(Article.date.desc())
+            select(Article)
+            .where(Article.is_draft.is_(False))
+            .order_by(Article.date.desc())
         ).all()
 
     items = [_serialize_summary(a, cat_by_id[a.category_id]) for a in articles]
@@ -77,7 +83,9 @@ def list_articles(
 
 @router.get("/articles/{slug}")
 def get_article(slug: str, session: Session = Depends(get_session)):
-    article = session.exec(select(Article).where(Article.slug == slug)).first()
+    article = session.exec(
+        select(Article).where(Article.slug == slug, Article.is_draft.is_(False))
+    ).first()
     if not article:
         raise HTTPException(
             status_code=404, detail=f"Article with slug '{slug}' not found"

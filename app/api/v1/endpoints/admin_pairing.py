@@ -28,14 +28,17 @@ class CategoryInput(BaseModel):
 class PairingItemInput(BaseModel):
     id: str | None = None
     category_id: int
-    sake_id: str = Field(min_length=1)
-    sakana_id: str = Field(min_length=1)
-    temperature: str = Field(min_length=1)
-    season: str = Field(min_length=1)
-    description: str = Field(min_length=1)
-    body: str = Field(min_length=1)
-    why_it_works: str = Field(min_length=1)
-    how_to_enjoy: str = Field(min_length=1)
+    sake_id: str = ""
+    sakana_id: str = ""
+    temperature: str = ""
+    season: str = ""
+    description: str = ""
+    body: str | None = None
+    why_it_works: str | None = None
+    how_to_enjoy: str | None = None
+    body_json: list[dict[str, Any]] | None = None
+    body_html: str | None = None
+    is_draft: bool = False
     hero_image: str | None = None
     persona_code: str | None = None
     position: int = 0
@@ -52,26 +55,29 @@ def _serialize_category(c: PairingCategory) -> dict[str, Any]:
 
 
 def _serialize_item(
-    item: PairingItem, sake: Sake, sakana: Sakana
+    item: PairingItem, sake: Sake | None, sakana: Sakana | None
 ) -> dict[str, Any]:
     return {
         "id": item.id,
         "categoryId": item.category_id,
-        "sakeId": sake.id,
-        "sakeName": sake.name,
-        "sakeBrewery": sake.brewery,
-        "sakeType": sake.type,
-        "sakeImageUrl": sake.image_url,
-        "sakanaId": sakana.id,
-        "sakanaName": sakana.name,
-        "sakanaEmoji": sakana.emoji,
-        "sakanaImageUrl": sakana.food_image_url,
+        "sakeId": sake.id if sake else item.sake_id or "",
+        "sakeName": sake.name if sake else "",
+        "sakeBrewery": sake.brewery if sake else "",
+        "sakeType": sake.type if sake else "",
+        "sakeImageUrl": sake.image_url if sake else None,
+        "sakanaId": sakana.id if sakana else item.sakana_id or "",
+        "sakanaName": sakana.name if sakana else "",
+        "sakanaEmoji": sakana.emoji if sakana else "",
+        "sakanaImageUrl": sakana.food_image_url if sakana else None,
         "temperature": item.temperature,
         "season": item.season,
         "description": item.description,
         "body": item.body,
         "whyItWorks": item.why_it_works,
         "howToEnjoy": item.how_to_enjoy,
+        "bodyJson": item.body_json,
+        "bodyHtml": item.body_html,
+        "isDraft": item.is_draft,
         "heroImage": item.hero_image,
         "personaCode": item.persona_code,
         "position": item.position,
@@ -79,9 +85,9 @@ def _serialize_item(
 
 
 def _resolve(session: Session, item: PairingItem) -> dict[str, Any]:
-    sake = session.get(Sake, item.sake_id)
-    sakana = session.get(Sakana, item.sakana_id)
-    if not sake or not sakana:
+    sake = session.get(Sake, item.sake_id) if item.sake_id else None
+    sakana = session.get(Sakana, item.sakana_id) if item.sakana_id else None
+    if not item.is_draft and (not sake or not sakana):
         raise HTTPException(
             status_code=500,
             detail=f"Pairing {item.id} references missing sake/sakana",
@@ -183,20 +189,42 @@ def get_pairing(item_id: str, session: Session = Depends(get_session)) -> dict:
     return _resolve(session, item)
 
 
-def _validate_refs(session: Session, body: PairingItemInput) -> None:
+def _validate_refs(session: Session, body: PairingItemInput, *, strict: bool) -> None:
     if not session.get(PairingCategory, body.category_id):
         raise HTTPException(status_code=400, detail="Unknown category_id")
-    if not session.get(Sake, body.sake_id):
-        raise HTTPException(status_code=400, detail="Unknown sake_id")
-    if not session.get(Sakana, body.sakana_id):
-        raise HTTPException(status_code=400, detail="Unknown sakana_id")
+    if strict or body.sake_id:
+        if not body.sake_id or not session.get(Sake, body.sake_id):
+            raise HTTPException(status_code=400, detail="Unknown sake_id")
+    if strict or body.sakana_id:
+        if not body.sakana_id or not session.get(Sakana, body.sakana_id):
+            raise HTTPException(status_code=400, detail="Unknown sakana_id")
+
+
+def _enforce_publish_rules(body: PairingItemInput) -> None:
+    if body.is_draft:
+        return
+    missing = [
+        k for k, v in {
+            "sake_id": body.sake_id,
+            "sakana_id": body.sakana_id,
+            "temperature": body.temperature,
+            "season": body.season,
+            "description": body.description,
+        }.items() if not v
+    ]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot publish without: {', '.join(missing)}",
+        )
 
 
 @router.post("/pairings", status_code=status.HTTP_201_CREATED)
 def create_pairing(
     body: PairingItemInput, session: Session = Depends(get_session)
 ) -> dict:
-    _validate_refs(session, body)
+    _validate_refs(session, body, strict=not body.is_draft)
+    _enforce_publish_rules(body)
     item_id = body.id or str(uuid.uuid4())
     if session.get(PairingItem, item_id):
         raise HTTPException(status_code=409, detail="Pairing id already exists")
@@ -217,7 +245,8 @@ def update_pairing(
     item = session.get(PairingItem, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Pairing not found")
-    _validate_refs(session, body)
+    _validate_refs(session, body, strict=not body.is_draft)
+    _enforce_publish_rules(body)
     data = body.model_dump(exclude={"id"})
     for k, v in data.items():
         setattr(item, k, v)

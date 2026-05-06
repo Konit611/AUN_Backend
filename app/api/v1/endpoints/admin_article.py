@@ -140,16 +140,20 @@ def delete_category(
 
 
 class ArticleInput(BaseModel):
+    # Drafts loosen most validations; published entries enforce them.
     slug: str = Field(min_length=1, max_length=80, pattern=r"^[a-z0-9-]+$")
     title: str = Field(min_length=1, max_length=120)
-    subtitle: str = Field(min_length=1)
-    excerpt: str = Field(min_length=1)
+    subtitle: str = ""
+    excerpt: str = ""
     category_id: int
     date: Date
-    read_time: str = Field(min_length=1, max_length=20)
-    emoji: str = Field(min_length=1, max_length=10)
+    read_time: str = ""
+    emoji: str = ""
     hero_image_url: str | None = None
     body: list[Block] = Field(default_factory=list)
+    body_json: list[dict[str, Any]] | None = None
+    body_html: str | None = None
+    is_draft: bool = False
 
 
 def _serialize_article(a: Article, c: ArticleCategory) -> dict[str, Any]:
@@ -167,6 +171,9 @@ def _serialize_article(a: Article, c: ArticleCategory) -> dict[str, Any]:
         "emoji": a.emoji,
         "heroImageUrl": a.hero_image_url,
         "body": a.body,
+        "bodyJson": a.body_json,
+        "bodyHtml": a.body_html,
+        "isDraft": a.is_draft,
         "updatedAt": a.updated_at.isoformat() if a.updated_at else None,
     }
 
@@ -194,6 +201,24 @@ def get_article(slug: str, session: Session = Depends(get_session)) -> dict:
     return _serialize_article(article, cat)
 
 
+def _enforce_publish_rules(body: ArticleInput) -> None:
+    if body.is_draft:
+        return
+    missing = [
+        k for k, v in {
+            "subtitle": body.subtitle,
+            "excerpt": body.excerpt,
+            "read_time": body.read_time,
+            "emoji": body.emoji,
+        }.items() if not v
+    ]
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Cannot publish without: {', '.join(missing)}",
+        )
+
+
 @router.post("/articles", status_code=status.HTTP_201_CREATED)
 def create_article(
     body: ArticleInput, session: Session = Depends(get_session)
@@ -203,6 +228,7 @@ def create_article(
         raise HTTPException(status_code=400, detail="Unknown category_id")
     if session.exec(select(Article).where(Article.slug == body.slug)).first():
         raise HTTPException(status_code=409, detail="Slug already exists")
+    _enforce_publish_rules(body)
     data = body.model_dump()
     data["body"] = [b.model_dump(exclude_none=True) for b in body.body]
     article = Article(**data, created_at=datetime.utcnow(), updated_at=datetime.utcnow())
@@ -232,6 +258,7 @@ def update_article(
         ).first()
         if clash:
             raise HTTPException(status_code=409, detail="Slug already exists")
+    _enforce_publish_rules(body)
     data = body.model_dump()
     data["body"] = [b.model_dump(exclude_none=True) for b in body.body]
     for k, v in data.items():

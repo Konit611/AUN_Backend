@@ -27,6 +27,15 @@ class Article(SQLModel, table=True):
     read_time: str
     emoji: str
     hero_image_url: str | None = None
+    # Legacy block-array body (paragraph/heading/image/quote). Kept for back-compat
+    # with rows authored before the BlockNote editor migration.
     body: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
+    # BlockNote editor state (PartialBlock[]) — source of truth for new entries.
+    body_json: list[dict[str, Any]] | None = Field(
+        default=None, sa_column=Column(JSON, nullable=True)
+    )
+    # Pre-rendered HTML used by SSR for SEO. Set when body_json is saved.
+    body_html: str | None = None
+    is_draft: bool = Field(default=False, index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)

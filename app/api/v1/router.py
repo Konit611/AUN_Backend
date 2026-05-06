@@ -5,6 +5,7 @@ from app.api.v1.endpoints import (
     admin_pairing,
     admin_sake,
     admin_sakana,
+    admin_uploads,
     articles,
     auth,
     pairing_guide,
@@ -27,3 +28,4 @@ router.include_router(admin_sakana.router)
 router.include_router(admin_sake.router)
 router.include_router(admin_pairing.router)
 router.include_router(admin_article.router)
+router.include_router(admin_uploads.router)
