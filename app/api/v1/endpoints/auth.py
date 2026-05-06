@@ -28,6 +28,7 @@ class UserPublic(BaseModel):
     id: int
     email: EmailStr
     username: str
+    is_admin: bool
     created_at: datetime
 
 
