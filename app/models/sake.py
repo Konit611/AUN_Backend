@@ -54,6 +54,12 @@ class Recipe(SQLModel, table=True):
     name: str = Field(unique=True, index=True)
     emoji: str
     image_placeholder: str | None = None
+    sweetness: float = 0.5
+    umami: float = 0.5
+    acidity: float = 0.3
+    fat: float = 0.3
+    aroma: float = 0.4
+    saltiness: float = 0.3
 
 
 class SakeRecipe(SQLModel, table=True):

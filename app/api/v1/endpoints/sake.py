@@ -3,6 +3,7 @@ from sqlmodel import Session, select
 
 from app.api.v1.schemas import paginate
 from app.core.database import get_session
+from app.core.pairing_score import rank_recipes
 from app.core.persona_profile import distance, is_valid_code
 from app.models.sake import Flavor, Recipe, Sake, SakeFlavor, SakeRecipe
 
@@ -23,11 +24,27 @@ def _serialize_summary(sake: Sake) -> dict:
     }
 
 
+def _serialize_pairing(recipe: Recipe, description: str = "") -> dict:
+    return {
+        "emoji": recipe.emoji,
+        "foodName": recipe.name,
+        "description": description,
+        "imagePlaceholder": recipe.image_placeholder or "",
+    }
+
+
 def _serialize_detail(
     sake: Sake,
     flavor_rows: list[tuple[SakeFlavor, Flavor]],
     pairing_rows: list[tuple[SakeRecipe, Recipe]],
+    all_recipes: list[Recipe],
 ) -> dict:
+    def algo_pairings(mode: str) -> list[dict]:
+        return [
+            _serialize_pairing(r)
+            for r, _score in rank_recipes(sake, all_recipes, mode, top_k=3)
+        ]
+
     return {
         "id": sake.id,
         "name": sake.name,
@@ -43,14 +60,12 @@ def _serialize_detail(
         ],
         "servingTags": _serving_tags(sake),
         "pairings": [
-            {
-                "emoji": recipe.emoji,
-                "foodName": recipe.name,
-                "description": link.description,
-                "imagePlaceholder": recipe.image_placeholder or "",
-            }
+            _serialize_pairing(recipe, link.description)
             for link, recipe in pairing_rows
         ],
+        "synergyPairings": algo_pairings("synergy"),
+        "cleansePairings": algo_pairings("cleanse"),
+        "contrastPairings": algo_pairings("contrast"),
     }
 
 
@@ -95,4 +110,5 @@ def get_sake(sake_id: str, session: Session = Depends(get_session)):
         .where(SakeRecipe.sake_id == sake_id)
         .order_by(SakeRecipe.position.asc())
     ).all()
-    return _serialize_detail(sake, flavor_rows, pairing_rows)
+    all_recipes = session.exec(select(Recipe)).all()
+    return _serialize_detail(sake, flavor_rows, pairing_rows, all_recipes)

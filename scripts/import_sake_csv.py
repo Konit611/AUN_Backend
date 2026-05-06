@@ -20,7 +20,8 @@ CSV columns:
     sake.csv:        id, name, brewery, region, description, type, rice,
                      polishing, serving_temperature, serving_season, persona_code
     flavor.csv:      id, label
-    recipe.csv:      id, name, emoji, image_placeholder
+    recipe.csv:      id, name, emoji, image_placeholder,
+                     sweetness, umami, acidity, fat, aroma, saltiness
     sake_flavor.csv: sake_id, flavor_id, is_primary, position
     sake_recipe.csv: sake_id, recipe_id, description, position
 """
@@ -45,7 +46,10 @@ SAKE_REQUIRED = {
     "sweetness", "umami", "acidity", "bitterness", "aroma",
 }
 FLAVOR_REQUIRED = {"id", "label"}
-RECIPE_REQUIRED = {"id", "name", "emoji"}
+RECIPE_REQUIRED = {
+    "id", "name", "emoji",
+    "sweetness", "umami", "acidity", "fat", "aroma", "saltiness",
+}
 SAKE_FLAVOR_REQUIRED = {"sake_id", "flavor_id", "is_primary", "position"}
 SAKE_RECIPE_REQUIRED = {"sake_id", "recipe_id", "description", "position"}
 
@@ -147,6 +151,9 @@ def _upsert_flavor(session: Session, rows: list[dict]) -> tuple[int, int]:
     return inserted, updated
 
 
+RECIPE_AXES = ("sweetness", "umami", "acidity", "fat", "aroma", "saltiness")
+
+
 def _upsert_recipe(session: Session, rows: list[dict]) -> tuple[int, int]:
     inserted = updated = 0
     for line_no, row in enumerate(rows, start=2):
@@ -157,17 +164,26 @@ def _upsert_recipe(session: Session, rows: list[dict]) -> tuple[int, int]:
             raise SystemExit(
                 f"recipe.csv row {line_no} missing id/name/emoji"
             )
+        try:
+            axes = {a: float(_clean(row[a])) for a in RECIPE_AXES}
+        except (KeyError, ValueError) as e:
+            raise SystemExit(
+                f"recipe.csv row {line_no} (id={rid!r}) invalid axis value: {e}"
+            )
         image = _optional(row.get("image_placeholder"))
         existing = session.get(Recipe, rid)
         if existing:
             existing.name = name
             existing.emoji = emoji
             existing.image_placeholder = image
+            for k, v in axes.items():
+                setattr(existing, k, v)
             session.add(existing)
             updated += 1
         else:
             session.add(Recipe(
                 id=rid, name=name, emoji=emoji, image_placeholder=image,
+                **axes,
             ))
             inserted += 1
     return inserted, updated
