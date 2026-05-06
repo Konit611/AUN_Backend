@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
+    admin_article,
     admin_pairing,
     admin_sake,
     admin_sakana,
@@ -25,3 +26,4 @@ router.include_router(journal.router, prefix="", tags=["journal"])
 router.include_router(admin_sakana.router)
 router.include_router(admin_sake.router)
 router.include_router(admin_pairing.router)
+router.include_router(admin_article.router)
