@@ -47,8 +47,8 @@ class SakeFlavor(SQLModel, table=True):
     position: int = 0
 
 
-class Recipe(SQLModel, table=True):
-    __tablename__ = "recipe"
+class Sakana(SQLModel, table=True):
+    __tablename__ = "sakana"
 
     id: str = Field(
         default_factory=lambda: str(uuid.uuid4()),
@@ -74,10 +74,10 @@ class Recipe(SQLModel, table=True):
     difficulty: str | None = None  # "easy" | "medium" | "hard"
 
 
-class SakeRecipe(SQLModel, table=True):
-    __tablename__ = "sake_recipe"
+class SakeSakana(SQLModel, table=True):
+    __tablename__ = "sake_sakana"
 
     sake_id: str = Field(foreign_key="sake.id", primary_key=True)
-    recipe_id: str = Field(foreign_key="recipe.id", primary_key=True)
+    sakana_id: str = Field(foreign_key="sakana.id", primary_key=True)
     description: str
     position: int = 0

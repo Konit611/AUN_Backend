@@ -9,7 +9,7 @@ from sqlmodel import Session, select
 from app.api.deps import require_admin
 from app.core.database import get_session
 from app.models.pairing_guide import PairingCategory, PairingItem
-from app.models.sake import Recipe, Sake
+from app.models.sake import Sake, Sakana
 
 router = APIRouter(
     prefix="/admin",
@@ -29,7 +29,7 @@ class PairingItemInput(BaseModel):
     id: str | None = None
     category_id: int
     sake_id: str = Field(min_length=1)
-    recipe_id: str = Field(min_length=1)
+    sakana_id: str = Field(min_length=1)
     temperature: str = Field(min_length=1)
     season: str = Field(min_length=1)
     description: str = Field(min_length=1)
@@ -52,7 +52,7 @@ def _serialize_category(c: PairingCategory) -> dict[str, Any]:
 
 
 def _serialize_item(
-    item: PairingItem, sake: Sake, recipe: Recipe
+    item: PairingItem, sake: Sake, sakana: Sakana
 ) -> dict[str, Any]:
     return {
         "id": item.id,
@@ -62,10 +62,10 @@ def _serialize_item(
         "sakeBrewery": sake.brewery,
         "sakeType": sake.type,
         "sakeImageUrl": sake.image_url,
-        "recipeId": recipe.id,
-        "recipeName": recipe.name,
-        "recipeEmoji": recipe.emoji,
-        "recipeImageUrl": recipe.food_image_url,
+        "sakanaId": sakana.id,
+        "sakanaName": sakana.name,
+        "sakanaEmoji": sakana.emoji,
+        "sakanaImageUrl": sakana.food_image_url,
         "temperature": item.temperature,
         "season": item.season,
         "description": item.description,
@@ -80,13 +80,13 @@ def _serialize_item(
 
 def _resolve(session: Session, item: PairingItem) -> dict[str, Any]:
     sake = session.get(Sake, item.sake_id)
-    recipe = session.get(Recipe, item.recipe_id)
-    if not sake or not recipe:
+    sakana = session.get(Sakana, item.sakana_id)
+    if not sake or not sakana:
         raise HTTPException(
             status_code=500,
-            detail=f"Pairing {item.id} references missing sake/recipe",
+            detail=f"Pairing {item.id} references missing sake/sakana",
         )
-    return _serialize_item(item, sake, recipe)
+    return _serialize_item(item, sake, sakana)
 
 
 # ── Categories ────────────────────────────────────
@@ -188,8 +188,8 @@ def _validate_refs(session: Session, body: PairingItemInput) -> None:
         raise HTTPException(status_code=400, detail="Unknown category_id")
     if not session.get(Sake, body.sake_id):
         raise HTTPException(status_code=400, detail="Unknown sake_id")
-    if not session.get(Recipe, body.recipe_id):
-        raise HTTPException(status_code=400, detail="Unknown recipe_id")
+    if not session.get(Sakana, body.sakana_id):
+        raise HTTPException(status_code=400, detail="Unknown sakana_id")
 
 
 @router.post("/pairings", status_code=status.HTTP_201_CREATED)

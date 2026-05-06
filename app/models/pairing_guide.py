@@ -17,7 +17,7 @@ class PairingItem(SQLModel, table=True):
     id: str = Field(primary_key=True)
     category_id: int = Field(foreign_key="pairing_category.id", index=True)
     sake_id: str = Field(foreign_key="sake.id", index=True)
-    recipe_id: str = Field(foreign_key="recipe.id", index=True)
+    sakana_id: str = Field(foreign_key="sakana.id", index=True)
     temperature: str
     season: str
     description: str

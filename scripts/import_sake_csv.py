@@ -6,13 +6,13 @@ Usage (inside the backend container):
 Reads five CSVs from `aun_back/data/`:
     - sake.csv          (one row per sake; no flavor/pairing columns)
     - flavor.csv        (master: id, label)
-    - recipe.csv        (master: id, name, emoji, image_placeholder)
+    - sakana.csv        (master: id, name, emoji, image_placeholder)
     - sake_flavor.csv   (M2M: sake_id, flavor_id, is_primary, position)
-    - sake_recipe.csv   (M2M: sake_id, recipe_id, description, position)
+    - sake_sakana.csv   (M2M: sake_id, sakana_id, description, position)
 
 Behaviour:
     - Idempotent on primary keys. Existing rows are updated; new rows inserted.
-    - Join tables (sake_flavor / sake_recipe) are fully replaced per sake_id
+    - Join tables (sake_flavor / sake_sakana) are fully replaced per sake_id
       that appears in those CSVs — children are recreated from the CSV.
     - Rows present in DB but missing from the CSVs are NOT deleted.
 
@@ -20,10 +20,10 @@ CSV columns:
     sake.csv:        id, name, brewery, region, description, type, rice,
                      polishing, serving_temperature, serving_season, persona_code
     flavor.csv:      id, label
-    recipe.csv:      id, name, emoji, image_placeholder,
+    sakana.csv:      id, name, emoji, image_placeholder,
                      sweetness, umami, acidity, fat, aroma, saltiness
     sake_flavor.csv: sake_id, flavor_id, is_primary, position
-    sake_recipe.csv: sake_id, recipe_id, description, position
+    sake_sakana.csv: sake_id, sakana_id, description, position
 """
 
 import csv
@@ -35,7 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from sqlmodel import Session, delete
 
 from app.core.database import engine
-from app.models.sake import Flavor, Recipe, Sake, SakeFlavor, SakeRecipe
+from app.models.sake import Flavor, Sake, SakeFlavor, SakeSakana, Sakana
 
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -46,12 +46,12 @@ SAKE_REQUIRED = {
     "sweetness", "umami", "acidity", "bitterness", "aroma",
 }
 FLAVOR_REQUIRED = {"id", "label"}
-RECIPE_REQUIRED = {
+SAKANA_REQUIRED = {
     "id", "name", "emoji",
     "sweetness", "umami", "acidity", "fat", "aroma", "saltiness",
 }
 SAKE_FLAVOR_REQUIRED = {"sake_id", "flavor_id", "is_primary", "position"}
-SAKE_RECIPE_REQUIRED = {"sake_id", "recipe_id", "description", "position"}
+SAKE_SAKANA_REQUIRED = {"sake_id", "sakana_id", "description", "position"}
 
 
 def _truthy(value: str | None) -> bool:
@@ -151,27 +151,27 @@ def _upsert_flavor(session: Session, rows: list[dict]) -> tuple[int, int]:
     return inserted, updated
 
 
-RECIPE_AXES = ("sweetness", "umami", "acidity", "fat", "aroma", "saltiness")
+SAKANA_AXES = ("sweetness", "umami", "acidity", "fat", "aroma", "saltiness")
 
 
-def _upsert_recipe(session: Session, rows: list[dict]) -> tuple[int, int]:
+def _upsert_sakana(session: Session, rows: list[dict]) -> tuple[int, int]:
     inserted = updated = 0
     for line_no, row in enumerate(rows, start=2):
-        rid = _clean(row.get("id"))
+        sid = _clean(row.get("id"))
         name = _clean(row.get("name"))
         emoji = _clean(row.get("emoji"))
-        if not rid or not name or not emoji:
+        if not sid or not name or not emoji:
             raise SystemExit(
-                f"recipe.csv row {line_no} missing id/name/emoji"
+                f"sakana.csv row {line_no} missing id/name/emoji"
             )
         try:
-            axes = {a: float(_clean(row[a])) for a in RECIPE_AXES}
+            axes = {a: float(_clean(row[a])) for a in SAKANA_AXES}
         except (KeyError, ValueError) as e:
             raise SystemExit(
-                f"recipe.csv row {line_no} (id={rid!r}) invalid axis value: {e}"
+                f"sakana.csv row {line_no} (id={sid!r}) invalid axis value: {e}"
             )
         image = _optional(row.get("image_placeholder"))
-        existing = session.get(Recipe, rid)
+        existing = session.get(Sakana, sid)
         if existing:
             existing.name = name
             existing.emoji = emoji
@@ -181,8 +181,8 @@ def _upsert_recipe(session: Session, rows: list[dict]) -> tuple[int, int]:
             session.add(existing)
             updated += 1
         else:
-            session.add(Recipe(
-                id=rid, name=name, emoji=emoji, image_placeholder=image,
+            session.add(Sakana(
+                id=sid, name=name, emoji=emoji, image_placeholder=image,
                 **axes,
             ))
             inserted += 1
@@ -219,18 +219,18 @@ def _replace_join(
 def import_all() -> dict[str, tuple[int, int] | int]:
     sake_rows = _read_csv(DATA_DIR / "sake.csv", SAKE_REQUIRED)
     flavor_rows = _read_csv(DATA_DIR / "flavor.csv", FLAVOR_REQUIRED)
-    recipe_rows = _read_csv(DATA_DIR / "recipe.csv", RECIPE_REQUIRED)
+    sakana_rows = _read_csv(DATA_DIR / "sakana.csv", SAKANA_REQUIRED)
     sake_flavor_rows = _read_csv(
         DATA_DIR / "sake_flavor.csv", SAKE_FLAVOR_REQUIRED
     )
-    sake_recipe_rows = _read_csv(
-        DATA_DIR / "sake_recipe.csv", SAKE_RECIPE_REQUIRED
+    sake_sakana_rows = _read_csv(
+        DATA_DIR / "sake_sakana.csv", SAKE_SAKANA_REQUIRED
     )
 
     with Session(engine) as session:
         sake_stats = _upsert_sake(session, sake_rows)
         flavor_stats = _upsert_flavor(session, flavor_rows)
-        recipe_stats = _upsert_recipe(session, recipe_rows)
+        sakana_stats = _upsert_sakana(session, sakana_rows)
         session.flush()
 
         sf_count = _replace_join(
@@ -243,24 +243,24 @@ def import_all() -> dict[str, tuple[int, int] | int]:
             ),
             "sake_flavor.csv",
         )
-        sr_count = _replace_join(
-            session, sake_recipe_rows, SakeRecipe, "sake_id", "recipe_id",
-            lambda r: SakeRecipe(
+        ss_count = _replace_join(
+            session, sake_sakana_rows, SakeSakana, "sake_id", "sakana_id",
+            lambda r: SakeSakana(
                 sake_id=_clean(r["sake_id"]),
-                recipe_id=_clean(r["recipe_id"]),
+                sakana_id=_clean(r["sakana_id"]),
                 description=_clean(r.get("description")),
                 position=int(_clean(r.get("position")) or 0),
             ),
-            "sake_recipe.csv",
+            "sake_sakana.csv",
         )
         session.commit()
 
     return {
         "sake": sake_stats,
         "flavor": flavor_stats,
-        "recipe": recipe_stats,
+        "sakana": sakana_stats,
         "sake_flavor": sf_count,
-        "sake_recipe": sr_count,
+        "sake_sakana": ss_count,
     }
 
 
@@ -268,9 +268,9 @@ def main() -> None:
     stats = import_all()
     print(f"sake:        inserted={stats['sake'][0]} updated={stats['sake'][1]}")
     print(f"flavor:      inserted={stats['flavor'][0]} updated={stats['flavor'][1]}")
-    print(f"recipe:      inserted={stats['recipe'][0]} updated={stats['recipe'][1]}")
+    print(f"sakana:      inserted={stats['sakana'][0]} updated={stats['sakana'][1]}")
     print(f"sake_flavor: rebuilt={stats['sake_flavor']}")
-    print(f"sake_recipe: rebuilt={stats['sake_recipe']}")
+    print(f"sake_sakana: rebuilt={stats['sake_sakana']}")
 
 
 if __name__ == "__main__":

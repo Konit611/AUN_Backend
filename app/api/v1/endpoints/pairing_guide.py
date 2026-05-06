@@ -1,6 +1,6 @@
-"""Pairing guide endpoints — joins pairing_item with sake + recipe.
+"""Pairing guide endpoints — joins pairing_item with sake + sakana.
 
-Items reference Sake (sake_id) and Recipe (recipe_id) as required FKs,
+Items reference Sake (sake_id) and Sakana (sakana_id) as required FKs,
 so display data (food name, sake name, images) is always derived from
 the canonical entities. Admin UI manages these via /api/v1/admin/pairings.
 """
@@ -9,7 +9,7 @@ from sqlmodel import Session, select
 
 from app.core.database import get_session
 from app.models.pairing_guide import PairingCategory, PairingItem
-from app.models.sake import Recipe, Sake
+from app.models.sake import Sake, Sakana
 
 router = APIRouter()
 
@@ -21,37 +21,37 @@ SEASON_FILTERS = [
 ]
 
 
-def _summary(item: PairingItem, sake: Sake, recipe: Recipe) -> dict:
+def _summary(item: PairingItem, sake: Sake, sakana: Sakana) -> dict:
     return {
         "id": item.id,
-        "emoji": recipe.emoji,
-        "foodName": recipe.name,
+        "emoji": sakana.emoji,
+        "foodName": sakana.name,
         "sakeName": sake.name,
         "sakeBrewery": sake.brewery,
         "sakeType": sake.type,
         "temperature": item.temperature,
         "season": item.season,
         "description": item.description,
-        "foodImage": recipe.food_image_url,
+        "foodImage": sakana.food_image_url,
         "sakeImage": sake.image_url,
         "heroImage": item.hero_image,
     }
 
 
-def _detail(item: PairingItem, sake: Sake, recipe: Recipe) -> dict:
+def _detail(item: PairingItem, sake: Sake, sakana: Sakana) -> dict:
     return {
-        **_summary(item, sake, recipe),
+        **_summary(item, sake, sakana),
         "body": item.body,
         "whyItWorks": item.why_it_works,
         "howToEnjoy": item.how_to_enjoy,
     }
 
 
-def _home_card(item: PairingItem, sake: Sake, recipe: Recipe) -> dict:
+def _home_card(item: PairingItem, sake: Sake, sakana: Sakana) -> dict:
     return {
         "id": item.id,
-        "emoji": recipe.emoji,
-        "food": recipe.name,
+        "emoji": sakana.emoji,
+        "food": sakana.name,
         "sake": sake.name,
         "temperature": item.temperature,
         "description": item.description,
@@ -60,17 +60,17 @@ def _home_card(item: PairingItem, sake: Sake, recipe: Recipe) -> dict:
 
 def _resolve_one(
     session: Session, item: PairingItem
-) -> tuple[PairingItem, Sake, Recipe] | None:
+) -> tuple[PairingItem, Sake, Sakana] | None:
     sake = session.get(Sake, item.sake_id)
-    recipe = session.get(Recipe, item.recipe_id)
-    if not sake or not recipe:
+    sakana = session.get(Sakana, item.sakana_id)
+    if not sake or not sakana:
         return None
-    return item, sake, recipe
+    return item, sake, sakana
 
 
 def _resolve_many(
     session: Session, items: list[PairingItem]
-) -> list[tuple[PairingItem, Sake, Recipe]]:
+) -> list[tuple[PairingItem, Sake, Sakana]]:
     out = []
     for it in items:
         triple = _resolve_one(session, it)
@@ -179,6 +179,6 @@ def get_item(item_id: str, session: Session = Depends(get_session)):
     if not triple:
         raise HTTPException(
             status_code=500,
-            detail=f"Pairing item '{item_id}' references missing sake/recipe",
+            detail=f"Pairing item '{item_id}' references missing sake/sakana",
         )
     return _detail(*triple)

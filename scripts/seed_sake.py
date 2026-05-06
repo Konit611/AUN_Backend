@@ -1,6 +1,6 @@
 """Seed pairing_category and pairing_item tables.
 
-Sake / flavor / recipe seeding has moved to scripts/import_sake_csv.py
+Sake / flavor / sakana seeding has moved to scripts/import_sake_csv.py
 (it reads the canonical CSVs in `aun_back/data/`). This script now only
 seeds the pairing_guide tables.
 

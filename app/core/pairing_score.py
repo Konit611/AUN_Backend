@@ -1,4 +1,4 @@
-"""Sake ↔ recipe pairing scores.
+"""Sake ↔ sakana pairing scores.
 
 Three modes mirror Japanese pairing tradition:
     - synergy_score (寄り添う): same-axis matching
@@ -8,17 +8,17 @@ Three modes mirror Japanese pairing tradition:
 Lower score = better pairing. Each function returns a single float;
 callers sort ascending and take top-K per mode.
 
-Recipe carries 6 axes (sweetness, umami, acidity, fat, aroma, saltiness).
+Sakana carries 6 axes (sweetness, umami, acidity, fat, aroma, saltiness).
 Sake carries 5 axes (sweetness, umami, acidity, bitterness, aroma) plus
 serving_temperature/season metadata.
 """
 
-from app.models.sake import Recipe, Sake
+from app.models.sake import Sake, Sakana
 
 
-def _recipe_weight(r: Recipe) -> float:
+def _sakana_weight(s: Sakana) -> float:
     """Boldness in the mouth — what the sake has to stand up to."""
-    return 0.4 * r.umami + 0.4 * r.fat + 0.2 * r.saltiness
+    return 0.4 * s.umami + 0.4 * s.fat + 0.2 * s.saltiness
 
 
 def _sake_weight(s: Sake) -> float:
@@ -36,58 +36,58 @@ def _temp_axis(s: Sake) -> float:
     return 0.0
 
 
-def _recipe_temp_pref(r: Recipe) -> float:
+def _sakana_temp_pref(s: Sakana) -> float:
     """+1 prefers chilled sake (light, acidic), -1 prefers warmed (rich)."""
-    cold = 0.5 * (1.0 - r.fat) + 0.5 * r.acidity
-    warm = 0.5 * r.umami + 0.5 * r.fat
+    cold = 0.5 * (1.0 - s.fat) + 0.5 * s.acidity
+    warm = 0.5 * s.umami + 0.5 * s.fat
     return cold - warm
 
 
-def synergy_score(sake: Sake, recipe: Recipe) -> float:
+def synergy_score(sake: Sake, sakana: Sakana) -> float:
     """同調 — closer matches. Lower is better.
 
     Volume/body matching is the *primary* axis (multiple Japanese sources call
     it the most important factor). Other axes are secondary and weighted
     accordingly. Soft sakes (爽酒, low umami AND low aroma) are scored as
-    "supporting actors" — they don't need to mirror the recipe's umami; they
+    "supporting actors" — they don't need to mirror the sakana's umami; they
     just shouldn't be drowned out.
     """
     is_soft_sake = sake.umami < 0.55 and sake.aroma < 0.55  # 爽酒-style
 
-    # Volume asymmetry: heavy recipe with light sake = sake crushed (full penalty),
-    # heavy sake with light recipe = sake "lifts" the dish (mild penalty).
-    volume_diff = _recipe_weight(recipe) - _sake_weight(sake)
+    # Volume asymmetry: heavy sakana with light sake = sake crushed (full penalty),
+    # heavy sake with light sakana = sake "lifts" the dish (mild penalty).
+    volume_diff = _sakana_weight(sakana) - _sake_weight(sake)
     p_volume = (volume_diff if volume_diff > 0 else 0.4 * volume_diff) ** 2
 
     if is_soft_sake:
         # Supporting-actor sake: only penalty is being overwhelmed
-        deficit_umami = max(0.0, recipe.umami - sake.umami - 0.2) ** 2
+        deficit_umami = max(0.0, sakana.umami - sake.umami - 0.2) ** 2
         excess_umami = 0.0
     else:
-        deficit_umami = max(0.0, recipe.umami - sake.umami) ** 2
-        excess_umami = max(0.0, sake.umami - recipe.umami) ** 2
+        deficit_umami = max(0.0, sakana.umami - sake.umami) ** 2
+        excess_umami = max(0.0, sake.umami - sakana.umami) ** 2
 
-    p_sweet_asym = max(0.0, recipe.sweetness - sake.sweetness) ** 2
-    p_acid_asym = max(0.0, recipe.acidity - sake.acidity) ** 2
-    p_aroma_asym = max(0.0, recipe.aroma - sake.aroma) ** 2
-    p_salt_umami = max(0.0, recipe.saltiness - sake.umami) ** 2
+    p_sweet_asym = max(0.0, sakana.sweetness - sake.sweetness) ** 2
+    p_acid_asym = max(0.0, sakana.acidity - sake.acidity) ** 2
+    p_aroma_asym = max(0.0, sakana.aroma - sake.aroma) ** 2
+    p_salt_umami = max(0.0, sakana.saltiness - sake.umami) ** 2
 
     # Bonus: 相乗 — both sides umami-strong (米の旨味 × 食材の旨味)
     b_umami_resonance = (
-        (sake.umami - 0.5) * (recipe.umami - 0.5)
-        if (sake.umami > 0.6 and recipe.umami > 0.6)
+        (sake.umami - 0.5) * (sakana.umami - 0.5)
+        if (sake.umami > 0.6 and sakana.umami > 0.6)
         else 0.0
     )
     # Bonus: 香り resonance — both sides aroma-strong (薫酒 + 香り高い food)
     b_aroma_resonance = (
-        (sake.aroma - 0.5) * (recipe.aroma - 0.5)
-        if (sake.aroma > 0.65 and recipe.aroma > 0.55)
+        (sake.aroma - 0.5) * (sakana.aroma - 0.5)
+        if (sake.aroma > 0.65 and sakana.aroma > 0.55)
         else 0.0
     )
     # Bonus: 酸 resonance — both sides acid-bright
     b_acid_resonance = (
-        (sake.acidity - 0.5) * (recipe.acidity - 0.5)
-        if (sake.acidity > 0.6 and recipe.acidity > 0.5)
+        (sake.acidity - 0.5) * (sakana.acidity - 0.5)
+        if (sake.acidity > 0.6 and sakana.acidity > 0.5)
         else 0.0
     )
 
@@ -105,16 +105,16 @@ def synergy_score(sake: Sake, recipe: Recipe) -> float:
     )
 
 
-def cleanse_score(sake: Sake, recipe: Recipe) -> float:
+def cleanse_score(sake: Sake, sakana: Sakana) -> float:
     """洗浄 — acidic sake refreshes the palate against dense food.
 
     Density = fat OR saltiness (whichever stronger). Without density there's
     nothing to clean → low-intensity dishes score poorly here. Lower is better.
     """
-    intensity = max(recipe.fat, recipe.saltiness)
+    intensity = max(sakana.fat, sakana.saltiness)
     cut = sake.acidity * intensity
-    weight_diff = (_sake_weight(sake) - _recipe_weight(recipe)) ** 2
-    aroma_clash = (recipe.saltiness * sake.aroma) if sake.aroma > 0.7 else 0.0
+    weight_diff = (_sake_weight(sake) - _sakana_weight(sakana)) ** 2
+    aroma_clash = (sakana.saltiness * sake.aroma) if sake.aroma > 0.7 else 0.0
     intensity_floor = max(0.0, 0.4 - intensity) ** 2  # both fat and salt low → no cleanse
 
     return (
@@ -125,7 +125,7 @@ def cleanse_score(sake: Sake, recipe: Recipe) -> float:
     )
 
 
-def contrast_score(sake: Sake, recipe: Recipe) -> float:
+def contrast_score(sake: Sake, sakana: Sakana) -> float:
     """対比 — sweet sake bridges salty/spicy food, or character meets character.
 
     The two classic 対比 patterns:
@@ -134,23 +134,23 @@ def contrast_score(sake: Sake, recipe: Recipe) -> float:
     Lower is better.
     """
     # Pattern 1: sweet sake bridges
-    salt_sweet_bridge = recipe.saltiness * sake.sweetness
-    fat_sweet_bridge = recipe.fat * sake.sweetness * 0.7
+    salt_sweet_bridge = sakana.saltiness * sake.sweetness
+    fat_sweet_bridge = sakana.fat * sake.sweetness * 0.7
     sweet_active = max(salt_sweet_bridge, fat_sweet_bridge)
 
     # Pattern 2: character meets character — high-aroma sake + aromatic food,
     # or high-acid sake + tangy food
     aroma_x_aroma = (
-        sake.aroma * recipe.aroma if (sake.aroma > 0.7 and recipe.aroma > 0.6) else 0.0
+        sake.aroma * sakana.aroma if (sake.aroma > 0.7 and sakana.aroma > 0.6) else 0.0
     )
     acid_x_acid = (
-        sake.acidity * recipe.acidity if (sake.acidity > 0.7 and recipe.acidity > 0.5) else 0.0
+        sake.acidity * sakana.acidity if (sake.acidity > 0.7 and sakana.acidity > 0.5) else 0.0
     )
     character_active = max(aroma_x_aroma, acid_x_acid)
 
     standout = max(sweet_active, character_active)
 
-    weight_diff = abs(_sake_weight(sake) - _recipe_weight(recipe))
+    weight_diff = abs(_sake_weight(sake) - _sakana_weight(sakana))
 
     # Penalty when neither pattern fires — contrast isn't applicable
     no_pattern_penalty = max(0.0, 0.3 - standout) ** 2
@@ -170,21 +170,21 @@ SCORERS = {
 }
 
 
-def rank_recipes(
-    sake: Sake, recipes: list[Recipe], mode: str, top_k: int = 3
-) -> list[tuple[Recipe, float]]:
-    """Return [(recipe, score), ...] sorted ascending (best first)."""
+def rank_sakana(
+    sake: Sake, sakana_list: list[Sakana], mode: str, top_k: int = 3
+) -> list[tuple[Sakana, float]]:
+    """Return [(sakana, score), ...] sorted ascending (best first)."""
     scorer = SCORERS[mode]
-    scored = [(r, scorer(sake, r)) for r in recipes]
+    scored = [(s, scorer(sake, s)) for s in sakana_list]
     scored.sort(key=lambda x: x[1])
     return scored[:top_k]
 
 
 def rank_sakes(
-    recipe: Recipe, sakes: list[Sake], mode: str, top_k: int = 3
+    sakana: Sakana, sakes: list[Sake], mode: str, top_k: int = 3
 ) -> list[tuple[Sake, float]]:
     """Return [(sake, score), ...] sorted ascending (best first)."""
     scorer = SCORERS[mode]
-    scored = [(s, scorer(s, recipe)) for s in sakes]
+    scored = [(s, scorer(s, sakana)) for s in sakes]
     scored.sort(key=lambda x: x[1])
     return scored[:top_k]

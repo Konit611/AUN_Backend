@@ -7,7 +7,7 @@ from sqlmodel import Session, select, delete
 
 from app.api.deps import require_admin
 from app.core.database import get_session
-from app.models.sake import Flavor, Recipe, Sake, SakeFlavor, SakeRecipe
+from app.models.sake import Flavor, Sake, SakeFlavor, SakeSakana, Sakana
 
 router = APIRouter(
     prefix="/admin/sakes",
@@ -22,7 +22,7 @@ class FlavorInput(BaseModel):
 
 
 class PairingInput(BaseModel):
-    recipe_id: str
+    sakana_id: str
     description: str = Field(min_length=1, max_length=500)
     position: int = 0
 
@@ -72,7 +72,7 @@ class SakeUpdateInput(BaseModel):
 def _serialize(
     sake: Sake,
     flavors: list[tuple[SakeFlavor, Flavor]],
-    pairings: list[tuple[SakeRecipe, Recipe]],
+    pairings: list[tuple[SakeSakana, Sakana]],
 ) -> dict[str, Any]:
     return {
         "id": sake.id,
@@ -102,13 +102,13 @@ def _serialize(
         ],
         "pairings": [
             {
-                "recipeId": r.id,
-                "recipeName": r.name,
-                "emoji": r.emoji,
+                "sakanaId": s.id,
+                "sakanaName": s.name,
+                "emoji": s.emoji,
                 "description": link.description,
                 "position": link.position,
             }
-            for link, r in pairings
+            for link, s in pairings
         ],
     }
 
@@ -121,10 +121,10 @@ def _load_relations(session: Session, sake_id: str):
         .order_by(SakeFlavor.position.asc())
     ).all()
     pairings = session.exec(
-        select(SakeRecipe, Recipe)
-        .join(Recipe, SakeRecipe.recipe_id == Recipe.id)
-        .where(SakeRecipe.sake_id == sake_id)
-        .order_by(SakeRecipe.position.asc())
+        select(SakeSakana, Sakana)
+        .join(Sakana, SakeSakana.sakana_id == Sakana.id)
+        .where(SakeSakana.sake_id == sake_id)
+        .order_by(SakeSakana.position.asc())
     ).all()
     return flavors, pairings
 
@@ -136,7 +136,7 @@ def _replace_relations(
     pairing_inputs: list[PairingInput],
 ) -> None:
     session.exec(delete(SakeFlavor).where(SakeFlavor.sake_id == sake_id))
-    session.exec(delete(SakeRecipe).where(SakeRecipe.sake_id == sake_id))
+    session.exec(delete(SakeSakana).where(SakeSakana.sake_id == sake_id))
     session.flush()
     for i, f in enumerate(flavor_inputs):
         if not session.get(Flavor, f.flavor_id):
@@ -152,14 +152,14 @@ def _replace_relations(
             )
         )
     for i, p in enumerate(pairing_inputs):
-        if not session.get(Recipe, p.recipe_id):
+        if not session.get(Sakana, p.sakana_id):
             raise HTTPException(
-                status_code=400, detail=f"Unknown recipe_id: {p.recipe_id}"
+                status_code=400, detail=f"Unknown sakana_id: {p.sakana_id}"
             )
         session.add(
-            SakeRecipe(
+            SakeSakana(
                 sake_id=sake_id,
-                recipe_id=p.recipe_id,
+                sakana_id=p.sakana_id,
                 description=p.description,
                 position=p.position if p.position >= 0 else i,
             )
@@ -231,7 +231,7 @@ def delete_sake(sake_id: str, session: Session = Depends(get_session)) -> None:
     if not sake:
         raise HTTPException(status_code=404, detail="Sake not found")
     session.exec(delete(SakeFlavor).where(SakeFlavor.sake_id == sake_id))
-    session.exec(delete(SakeRecipe).where(SakeRecipe.sake_id == sake_id))
+    session.exec(delete(SakeSakana).where(SakeSakana.sake_id == sake_id))
     session.delete(sake)
     session.commit()
 
@@ -242,9 +242,9 @@ def list_flavors(session: Session = Depends(get_session)) -> list[dict]:
     return [{"id": f.id, "label": f.label} for f in rows]
 
 
-@router.get("/_meta/recipes")
-def list_recipes_for_pairing(
+@router.get("/_meta/sakana")
+def list_sakana_for_pairing(
     session: Session = Depends(get_session),
 ) -> list[dict]:
-    rows = session.exec(select(Recipe).order_by(Recipe.name.asc())).all()
-    return [{"id": r.id, "name": r.name, "emoji": r.emoji} for r in rows]
+    rows = session.exec(select(Sakana).order_by(Sakana.name.asc())).all()
+    return [{"id": s.id, "name": s.name, "emoji": s.emoji} for s in rows]

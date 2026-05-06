@@ -3,9 +3,9 @@ from sqlmodel import Session, select
 
 from app.api.v1.schemas import paginate
 from app.core.database import get_session
-from app.core.pairing_score import rank_recipes
+from app.core.pairing_score import rank_sakana
 from app.core.persona_profile import distance, is_valid_code
-from app.models.sake import Flavor, Recipe, Sake, SakeFlavor, SakeRecipe
+from app.models.sake import Flavor, Sake, SakeFlavor, SakeSakana, Sakana
 
 router = APIRouter()
 
@@ -24,25 +24,25 @@ def _serialize_summary(sake: Sake) -> dict:
     }
 
 
-def _serialize_pairing(recipe: Recipe, description: str = "") -> dict:
+def _serialize_pairing(sakana: Sakana, description: str = "") -> dict:
     return {
-        "emoji": recipe.emoji,
-        "foodName": recipe.name,
+        "emoji": sakana.emoji,
+        "foodName": sakana.name,
         "description": description,
-        "imagePlaceholder": recipe.image_placeholder or "",
+        "imagePlaceholder": sakana.image_placeholder or "",
     }
 
 
 def _serialize_detail(
     sake: Sake,
     flavor_rows: list[tuple[SakeFlavor, Flavor]],
-    pairing_rows: list[tuple[SakeRecipe, Recipe]],
-    all_recipes: list[Recipe],
+    pairing_rows: list[tuple[SakeSakana, Sakana]],
+    all_sakana: list[Sakana],
 ) -> dict:
     def algo_pairings(mode: str) -> list[dict]:
         return [
-            _serialize_pairing(r)
-            for r, _score in rank_recipes(sake, all_recipes, mode, top_k=3)
+            _serialize_pairing(s)
+            for s, _score in rank_sakana(sake, all_sakana, mode, top_k=3)
         ]
 
     return {
@@ -60,8 +60,8 @@ def _serialize_detail(
         ],
         "servingTags": _serving_tags(sake),
         "pairings": [
-            _serialize_pairing(recipe, link.description)
-            for link, recipe in pairing_rows
+            _serialize_pairing(sakana, link.description)
+            for link, sakana in pairing_rows
         ],
         "synergyPairings": algo_pairings("synergy"),
         "cleansePairings": algo_pairings("cleanse"),
@@ -105,10 +105,10 @@ def get_sake(sake_id: str, session: Session = Depends(get_session)):
         .order_by(SakeFlavor.position.asc())
     ).all()
     pairing_rows = session.exec(
-        select(SakeRecipe, Recipe)
-        .join(Recipe, SakeRecipe.recipe_id == Recipe.id)
-        .where(SakeRecipe.sake_id == sake_id)
-        .order_by(SakeRecipe.position.asc())
+        select(SakeSakana, Sakana)
+        .join(Sakana, SakeSakana.sakana_id == Sakana.id)
+        .where(SakeSakana.sake_id == sake_id)
+        .order_by(SakeSakana.position.asc())
     ).all()
-    all_recipes = session.exec(select(Recipe)).all()
-    return _serialize_detail(sake, flavor_rows, pairing_rows, all_recipes)
+    all_sakana = session.exec(select(Sakana)).all()
+    return _serialize_detail(sake, flavor_rows, pairing_rows, all_sakana)

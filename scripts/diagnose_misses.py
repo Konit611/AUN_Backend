@@ -8,18 +8,18 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from scripts.validate_pairing_rules import (
     _load_manual_pairings,
-    _load_recipes,
+    _load_sakana,
     _load_sakes,
 )
 from app.core.pairing_score import (
     SCORERS,
-    _recipe_weight,
+    _sakana_weight,
     _sake_weight,
-    rank_recipes,
+    rank_sakana,
 )
 
 
-# Mode classification per pairing based on description in sake_recipe.csv.
+# Mode classification per pairing based on description in sake_sakana.csv.
 # S = synergy (同調), C = contrast (対比), W = cleanse (洗浄/wash).
 INTENDED_MODE = {
     ("dassai-45", "92053519-ba49-4d32-b8e9-f385462d5d48"): "S",  # 焼き鳥タレ
@@ -54,19 +54,19 @@ INTENDED_MODE = {
 MODE_NAME = {"S": "synergy", "C": "contrast", "W": "cleanse"}
 
 
-def _explain_synergy(sake, recipe):
+def _explain_synergy(sake, sakana):
     """Return list of (label, weight, value, contribution) for each term."""
-    p_umami = (sake.umami - recipe.umami) ** 2
-    p_sweet_sym = (sake.sweetness - recipe.sweetness) ** 2
-    p_sweet_asym = max(0.0, recipe.sweetness - sake.sweetness) ** 2
-    p_acid_asym = max(0.0, recipe.acidity - sake.acidity) ** 2
-    p_aroma_asym = max(0.0, recipe.aroma - sake.aroma) ** 2
-    p_salt_aroma = (recipe.saltiness * sake.aroma) ** 2 if sake.aroma > 0.7 else 0.0
-    p_salt_umami = max(0.0, recipe.saltiness - sake.umami) ** 2
-    p_weight_asym = max(0.0, _recipe_weight(recipe) - _sake_weight(sake)) ** 2
+    p_umami = (sake.umami - sakana.umami) ** 2
+    p_sweet_sym = (sake.sweetness - sakana.sweetness) ** 2
+    p_sweet_asym = max(0.0, sakana.sweetness - sake.sweetness) ** 2
+    p_acid_asym = max(0.0, sakana.acidity - sake.acidity) ** 2
+    p_aroma_asym = max(0.0, sakana.aroma - sake.aroma) ** 2
+    p_salt_aroma = (sakana.saltiness * sake.aroma) ** 2 if sake.aroma > 0.7 else 0.0
+    p_salt_umami = max(0.0, sakana.saltiness - sake.umami) ** 2
+    p_weight_asym = max(0.0, _sakana_weight(sakana) - _sake_weight(sake)) ** 2
     b_fat_sweet = (
-        recipe.fat * sake.sweetness
-        if (recipe.fat > 0.5 and sake.sweetness > 0.5)
+        sakana.fat * sake.sweetness
+        if (sakana.fat > 0.5 and sake.sweetness > 0.5)
         else 0.0
     )
     return [
@@ -84,44 +84,44 @@ def _explain_synergy(sake, recipe):
 
 def main() -> None:
     sakes = _load_sakes()
-    recipes_d = _load_recipes()
-    recipes = list(recipes_d.values())
+    sakana_d = _load_sakana()
+    sakana_list = list(sakana_d.values())
     pairs = _load_manual_pairings()
 
     rank_cache: dict[tuple[str, str], list[str]] = {}
     for sake_id, sake in sakes.items():
         for mode in SCORERS:
-            top = rank_recipes(sake, recipes, mode, top_k=26)
-            rank_cache[(sake_id, mode)] = [r.id for r, _ in top]
+            top = rank_sakana(sake, sakana_list, mode, top_k=26)
+            rank_cache[(sake_id, mode)] = [s.id for s, _ in top]
 
     print(f"{'pairing':<48}{'intended':<10}{'rank_S':<8}{'rank_W':<8}{'rank_C':<8}")
     print("-" * 90)
-    for sake_id, recipe_id in pairs:
+    for sake_id, sakana_id in pairs:
         sake = sakes[sake_id]
-        recipe = recipes_d[recipe_id]
-        intended = INTENDED_MODE.get((sake_id, recipe_id), "?")
+        sakana = sakana_d[sakana_id]
+        intended = INTENDED_MODE.get((sake_id, sakana_id), "?")
         ranks = {}
         for mode in SCORERS:
             ids = rank_cache[(sake_id, mode)]
-            ranks[mode] = ids.index(recipe_id) + 1 if recipe_id in ids else "-"
-        label = f"{sake.name[:18]} × {recipe.name[:18]}"
+            ranks[mode] = ids.index(sakana_id) + 1 if sakana_id in ids else "-"
+        label = f"{sake.name[:18]} × {sakana.name[:18]}"
         print(
             f"{label:<48}{MODE_NAME[intended]:<10}"
             f"{str(ranks['synergy']):<8}{str(ranks['cleanse']):<8}{str(ranks['contrast']):<8}"
         )
 
     print("\n--- Synergy term breakdown for misses (intended = S, rank_S > 3) ---\n")
-    for sake_id, recipe_id in pairs:
-        if INTENDED_MODE.get((sake_id, recipe_id)) != "S":
+    for sake_id, sakana_id in pairs:
+        if INTENDED_MODE.get((sake_id, sakana_id)) != "S":
             continue
         sake = sakes[sake_id]
-        recipe = recipes_d[recipe_id]
+        sakana = sakana_d[sakana_id]
         ids = rank_cache[(sake_id, "synergy")]
-        rank = ids.index(recipe_id) + 1
+        rank = ids.index(sakana_id) + 1
         if rank <= 3:
             continue
-        print(f"{sake.name} × {recipe.name}  (rank #{rank})")
-        terms = _explain_synergy(sake, recipe)
+        print(f"{sake.name} × {sakana.name}  (rank #{rank})")
+        terms = _explain_synergy(sake, sakana)
         terms.sort(key=lambda t: -abs(t[3]))
         for label, w, val, contrib in terms[:5]:
             print(f"  {label:<14} weight={w:+.2f} value={val:.3f} → {contrib:+.3f}")
