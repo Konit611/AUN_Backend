@@ -1,6 +1,8 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
+from sqlalchemy import JSON, Column
 from sqlmodel import Field, SQLModel
 
 
@@ -22,6 +24,7 @@ class Sake(SQLModel, table=True):
     acidity: float = 0.5
     bitterness: float = 0.3
     aroma: float = 0.5
+    image_url: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -60,6 +63,15 @@ class Recipe(SQLModel, table=True):
     fat: float = 0.3
     aroma: float = 0.4
     saltiness: float = 0.3
+    food_image_url: str | None = None
+    ingredients: list[dict[str, Any]] | None = Field(
+        default=None, sa_column=Column(JSON)
+    )
+    steps: list[str] | None = Field(default=None, sa_column=Column(JSON))
+    prep_time_min: int | None = None
+    cook_time_min: int | None = None
+    servings: int | None = None
+    difficulty: str | None = None  # "easy" | "medium" | "hard"
 
 
 class SakeRecipe(SQLModel, table=True):
