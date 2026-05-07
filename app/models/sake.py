@@ -25,6 +25,7 @@ class Sake(SQLModel, table=True):
     bitterness: float = 0.3
     aroma: float = 0.5
     image_url: str | None = None
+    purchase_url: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -56,6 +57,7 @@ class Sakana(SQLModel, table=True):
     )
     name: str = Field(unique=True, index=True)
     emoji: str
+    description: str | None = None
     image_placeholder: str | None = None
     sweetness: float = 0.5
     umami: float = 0.5
