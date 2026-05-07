@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.api.v1.endpoints import (
     admin_article,
+    admin_data,
     admin_pairing,
     admin_sake,
     admin_sakana,
@@ -29,3 +30,4 @@ router.include_router(admin_sake.router)
 router.include_router(admin_pairing.router)
 router.include_router(admin_article.router)
 router.include_router(admin_uploads.router)
+router.include_router(admin_data.router)
