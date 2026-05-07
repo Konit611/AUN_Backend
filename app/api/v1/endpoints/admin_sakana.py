@@ -23,7 +23,9 @@ class IngredientInput(BaseModel):
 
 class SakanaInput(BaseModel):
     name: str = Field(min_length=1, max_length=100)
-    emoji: str = Field(min_length=1, max_length=10)
+    # Emoji is a placeholder for when there's no food image — purely optional.
+    emoji: str = Field(default="", max_length=10)
+    description: str | None = None
     image_placeholder: str | None = None
     food_image_url: str | None = None
     sweetness: float = Field(ge=0.0, le=1.0)
@@ -45,6 +47,7 @@ def _serialize(s: Sakana) -> dict[str, Any]:
         "id": s.id,
         "name": s.name,
         "emoji": s.emoji,
+        "description": s.description,
         "imagePlaceholder": s.image_placeholder,
         "foodImageUrl": s.food_image_url,
         "sweetness": s.sweetness,

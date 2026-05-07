@@ -44,6 +44,7 @@ def _detail(
 ) -> dict:
     return {
         **_summary(s),
+        "description": s.description,
         "ingredients": s.ingredients or [],
         "steps": s.steps or [],
         "servings": s.servings,
