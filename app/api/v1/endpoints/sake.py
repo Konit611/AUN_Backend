@@ -55,6 +55,8 @@ def _serialize_detail(
         "type": sake.type,
         "rice": sake.rice,
         "polishing": sake.polishing,
+        "imageUrl": sake.image_url,
+        "purchaseUrl": sake.purchase_url,
         "flavorTags": [
             {"label": flavor.label, "primary": link.is_primary}
             for link, flavor in flavor_rows
