@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     DB_USER: str = "aun"
     DB_PASSWORD: str = "changeme"
     DB_NAME: str = "aun"
+    # Empty for local docker postgres; set to "require" (or stricter) when
+    # connecting to managed services like RDS that enforce TLS.
+    DB_SSLMODE: str = ""
 
     JWT_SECRET: str = "dev-secret-change-in-production"
     JWT_ALGORITHM: str = "HS256"
@@ -21,7 +24,13 @@ class Settings(BaseSettings):
     @computed_field
     @property
     def DATABASE_URL(self) -> str:
-        return f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        base = (
+            f"postgresql://{self.DB_USER}:{self.DB_PASSWORD}"
+            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+        )
+        if self.DB_SSLMODE:
+            return f"{base}?sslmode={self.DB_SSLMODE}"
+        return base
 
     @computed_field
     @property
