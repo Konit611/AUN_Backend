@@ -6,7 +6,7 @@ FastAPI + SQLModel + Alembic で構築されたバックエンドAPIサーバー
 
 - Python 3.13+
 - [uv](https://docs.astral.sh/uv/)
-- PostgreSQL 17
+- PostgreSQL 18
 
 ## セットアップ
 
