@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     DB_PASSWORD: str = "changeme"
     DB_NAME: str = "aun"
     # Empty for local docker postgres; set to "require" (or stricter) when
-    # connecting to managed services like RDS that enforce TLS.
+    # connecting to managed Postgres services like Supabase that enforce TLS.
     DB_SSLMODE: str = ""
 
     JWT_SECRET: str = "dev-secret-change-in-production"

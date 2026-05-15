@@ -1,9 +1,10 @@
 """Admin file upload endpoint.
 
-Issues short-lived S3 presigned PUT URLs for the admin frontend's
-ImageUploader and BlockNote editor. When S3 env vars are not configured the
-endpoint falls back to a stub response so dev environments without AWS keys
-keep working — the frontend then inlines the file as a data URL.
+Issues short-lived presigned PUT URLs (S3-compatible: AWS S3, Supabase
+Storage, R2, etc.) for the admin frontend's ImageUploader and BlockNote
+editor. When STORAGE_* env vars are not configured the endpoint falls back
+to a stub response so dev environments without storage keys keep working —
+the frontend then inlines the file as a data URL.
 """
 import os
 import re
@@ -53,42 +54,53 @@ def _safe_filename(name: str) -> str:
 
 
 def _s3_config() -> dict[str, Any] | None:
-    """Return the S3 config dict if env vars are set; else None (stub mode)."""
-    bucket = os.environ.get("S3_BUCKET")
-    if not bucket:
+    """Return the storage config dict if env vars are fully set; else None (stub mode).
+
+    Requires STORAGE_BUCKET, STORAGE_ENDPOINT_URL, and STORAGE_PUBLIC_BASE_URL
+    to all be explicitly set. No provider-specific defaults are assumed.
+    """
+    bucket = os.environ.get("STORAGE_BUCKET")
+    endpoint = os.environ.get("STORAGE_ENDPOINT_URL")
+    public_base = os.environ.get("STORAGE_PUBLIC_BASE_URL")
+    if not (bucket and endpoint and public_base):
         return None
-    region = os.environ.get("S3_REGION") or "us-east-1"
-    public_base = (
-        os.environ.get("S3_PUBLIC_BASE_URL")
-        or f"https://{bucket}.s3.{region}.amazonaws.com"
-    )
-    return {"bucket": bucket, "region": region, "public_base": public_base}
+    region = os.environ.get("STORAGE_REGION") or "us-east-1"
+    return {
+        "bucket": bucket,
+        "region": region,
+        "endpoint": endpoint,
+        "public_base": public_base,
+    }
 
 
 @lru_cache(maxsize=1)
 def _s3_client():
-    """Boto3 S3 client. Auto-discovers credentials from AWS_ACCESS_KEY_ID /
-    AWS_SECRET_ACCESS_KEY env vars or, when running on EC2, the instance's
-    IAM role.
+    """Boto3 S3-compatible client (works with any S3-compatible storage:
+    Supabase Storage, Cloudflare R2, Backblaze B2, MinIO, etc.).
 
-    Pin to the regional endpoint + virtual-host addressing so presigned PUTs
-    don't 307-redirect (the redirect breaks CORS preflight).
+    Reads credentials from STORAGE_ACCESS_KEY_ID / STORAGE_SECRET_ACCESS_KEY
+    and the endpoint from STORAGE_ENDPOINT_URL. Uses path-style addressing
+    (required by Supabase Storage and most S3-compat providers).
     """
-    region = os.environ.get("S3_REGION") or "us-east-1"
+    cfg = _s3_config()
+    if cfg is None:
+        raise RuntimeError("Storage env vars not configured")
     return boto3.client(
         "s3",
-        region_name=region,
-        endpoint_url=f"https://s3.{region}.amazonaws.com",
+        aws_access_key_id=os.environ.get("STORAGE_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.environ.get("STORAGE_SECRET_ACCESS_KEY"),
+        region_name=cfg["region"],
+        endpoint_url=cfg["endpoint"],
         config=Config(
             signature_version="s3v4",
-            s3={"addressing_style": "virtual"},
+            s3={"addressing_style": "path"},
         ),
     )
 
 
 def _stub_response(key: str, content_type: str) -> SignResponse:
     public_base = os.environ.get(
-        "S3_PUBLIC_BASE_URL", "https://example-cdn.local"
+        "STORAGE_PUBLIC_BASE_URL", "https://example-cdn.local"
     )
     return SignResponse(
         upload_url=f"{public_base}/{key}?stub=1",
