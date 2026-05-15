@@ -97,13 +97,18 @@ class UserPublic(BaseModel):
 
 
 def _set_auth_cookie(response: Response, token: str) -> None:
+    # SameSite=None is required for cross-site cookies (e.g. Vercel frontend
+    # hitting a Render backend on a different domain). Browsers reject
+    # SameSite=None unless Secure is also set, so this only works over HTTPS.
+    # In local dev (DEBUG=true) we keep Lax since the cookie travels same-site.
+    samesite: str = "none" if settings.COOKIE_SECURE else "lax"
     response.set_cookie(
         key=settings.AUTH_COOKIE_NAME,
         value=token,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         httponly=True,
         secure=settings.COOKIE_SECURE,
-        samesite="lax",
+        samesite=samesite,
         path="/",
     )
 
