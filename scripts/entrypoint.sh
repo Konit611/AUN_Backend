@@ -19,8 +19,10 @@ except Exception:
 done
 echo "[entrypoint] Database is ready."
 
-echo "[entrypoint] Running alembic migrations..."
-uv run alembic upgrade head
+# Migrations are applied manually via Render Shell (or locally) when schema
+# changes ship. Running `alembic upgrade head` on every container start OOMs
+# Render's free tier (512MB).
+# To migrate: open Render Shell on this service and run `uv run alembic upgrade head`.
 
 echo "[entrypoint] Bootstrapping admin user..."
 uv run python scripts/create_admin.py
