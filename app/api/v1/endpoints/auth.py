@@ -102,7 +102,7 @@ def _set_auth_cookie(response: Response, token: str) -> None:
     # SameSite=None unless Secure is also set, so this only works over HTTPS.
     # In local dev (DEBUG=true) we keep Lax since the cookie travels same-site.
     samesite: str = "none" if settings.COOKIE_SECURE else "lax"
-    response.set_cookie(
+    kwargs = dict(
         key=settings.AUTH_COOKIE_NAME,
         value=token,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
@@ -111,6 +111,9 @@ def _set_auth_cookie(response: Response, token: str) -> None:
         samesite=samesite,
         path="/",
     )
+    if settings.COOKIE_DOMAIN:
+        kwargs["domain"] = settings.COOKIE_DOMAIN
+    response.set_cookie(**kwargs)
 
 
 @router.post("/signup", response_model=UserPublic, status_code=status.HTTP_201_CREATED)
@@ -172,7 +175,12 @@ def login(
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout() -> Response:
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
-    response.delete_cookie(key=settings.AUTH_COOKIE_NAME, path="/")
+    # Browsers only delete a cookie when the deletion call matches the
+    # original Domain attribute, so we must mirror COOKIE_DOMAIN here.
+    kwargs = dict(key=settings.AUTH_COOKIE_NAME, path="/")
+    if settings.COOKIE_DOMAIN:
+        kwargs["domain"] = settings.COOKIE_DOMAIN
+    response.delete_cookie(**kwargs)
     return response
 
 

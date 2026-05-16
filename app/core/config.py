@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     AUTH_COOKIE_NAME: str = "access_token"
+    # Set to ".aunsake.com" in prod so the cookie is shared between the
+    # frontend (aunsake.com) and the backend (api.aunsake.com). Leave empty
+    # in local dev — the cookie is host-only and stays on localhost.
+    COOKIE_DOMAIN: str = ""
 
     @computed_field
     @property
