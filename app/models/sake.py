@@ -25,7 +25,8 @@ class Sake(SQLModel, table=True):
     bitterness: float = 0.3
     aroma: float = 0.5
     image_url: str | None = None
-    purchase_url: str | None = None
+    amazon_url: str | None = None
+    rakuten_url: str | None = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 

@@ -44,7 +44,8 @@ class SakeInput(BaseModel):
     bitterness: float = Field(ge=0.0, le=1.0)
     aroma: float = Field(ge=0.0, le=1.0)
     image_url: str | None = None
-    purchase_url: str | None = None
+    amazon_url: str | None = None
+    rakuten_url: str | None = None
     flavors: list[FlavorInput] = []
     pairings: list[PairingInput] = []
 
@@ -66,7 +67,8 @@ class SakeUpdateInput(BaseModel):
     bitterness: float = Field(ge=0.0, le=1.0)
     aroma: float = Field(ge=0.0, le=1.0)
     image_url: str | None = None
-    purchase_url: str | None = None
+    amazon_url: str | None = None
+    rakuten_url: str | None = None
     flavors: list[FlavorInput] = []
     pairings: list[PairingInput] = []
 
@@ -93,7 +95,8 @@ def _serialize(
         "bitterness": sake.bitterness,
         "aroma": sake.aroma,
         "imageUrl": sake.image_url,
-        "purchaseUrl": sake.purchase_url,
+        "amazonUrl": sake.amazon_url,
+        "rakutenUrl": sake.rakuten_url,
         "flavors": [
             {
                 "flavorId": f.id,
