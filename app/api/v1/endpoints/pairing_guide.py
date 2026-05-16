@@ -12,17 +12,10 @@ from sqlmodel import Session, select
 from app.api.deps import get_optional_user
 from app.core.database import get_session
 from app.models.pairing_guide import PairingCategory, PairingItem
-from app.models.sake import Sake, Sakana
+from app.models.sake import Sake, SakanaCategory, Sakana
 from app.models.user import User
 
 router = APIRouter()
-
-SEASON_FILTERS = [
-    {"key": "all", "label": "すべて"},
-    {"key": "your-type", "label": "あなたのタイプ"},
-    {"key": "winter", "label": "冬", "match": "冬"},
-    {"key": "year-round", "label": "通年", "match": "通年"},
-]
 
 
 def _summary(item: PairingItem, sake: Sake, sakana: Sakana) -> dict:
@@ -174,8 +167,8 @@ def get_home(
                     break
     classic = classic[:4]
 
-    cats = session.exec(
-        select(PairingCategory).order_by(PairingCategory.position.asc())
+    sakana_cats = session.exec(
+        select(SakanaCategory).order_by(SakanaCategory.position.asc())
     ).all()
 
     featured = _featured_sake(session, viewer)
@@ -187,7 +180,9 @@ def get_home(
         "classic": {
             "items": [_home_card(*t) for t in classic],
         },
-        "foodCategories": [{"key": c.slug, "label": c.label} for c in cats],
+        "foodCategories": [
+            {"key": c.slug, "label": c.label} for c in sakana_cats
+        ],
         "featuredSake": _serialize_featured(*featured) if featured else None,
     }
 
@@ -215,14 +210,7 @@ def get_pairing_guide(session: Session = Depends(get_session)):
             "items": [_summary(*t) for t in resolved],
         })
 
-    food_filters = [{"key": c.slug, "label": c.label} for c in cats]
-    return {
-        "categories": out_categories,
-        "filters": {
-            "seasons": SEASON_FILTERS,
-            "foodCategories": food_filters,
-        },
-    }
+    return {"categories": out_categories}
 
 
 @router.get("/pairing-guide/categories")

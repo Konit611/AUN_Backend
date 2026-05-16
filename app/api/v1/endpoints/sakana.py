@@ -11,7 +11,7 @@ from sqlmodel import Session, select
 from app.api.v1.schemas import paginate
 from app.core.database import get_session
 from app.core.pairing_score import rank_sakes
-from app.models.sake import Sake, SakeSakana, Sakana
+from app.models.sake import Sake, SakanaCategory, SakeSakana, Sakana
 
 router = APIRouter()
 
@@ -20,6 +20,7 @@ def _summary(s: Sakana) -> dict:
     return {
         "id": s.id,
         "name": s.name,
+        "categoryId": s.category_id,
         "emoji": s.emoji,
         "imagePlaceholder": s.image_placeholder,
         "foodImageUrl": s.food_image_url,
@@ -77,11 +78,31 @@ def _detail(
 def list_sakana(
     page: int = 1,
     page_size: int = 20,
+    category: str | None = None,
     session: Session = Depends(get_session),
 ):
-    rows = session.exec(select(Sakana).order_by(Sakana.name.asc())).all()
+    stmt = select(Sakana).order_by(Sakana.name.asc())
+    if category:
+        cat = session.exec(
+            select(SakanaCategory).where(SakanaCategory.slug == category)
+        ).first()
+        if not cat:
+            return paginate([], page, page_size)
+        stmt = stmt.where(Sakana.category_id == cat.id)
+    rows = session.exec(stmt).all()
     items = [_summary(s) for s in rows]
     return paginate(items, page, page_size)
+
+
+@router.get("/sakana-categories")
+def list_sakana_categories(session: Session = Depends(get_session)) -> list[dict]:
+    rows = session.exec(
+        select(SakanaCategory).order_by(SakanaCategory.position.asc())
+    ).all()
+    return [
+        {"id": c.id, "slug": c.slug, "label": c.label, "position": c.position}
+        for c in rows
+    ]
 
 
 @router.get("/sakana/{sakana_id}")

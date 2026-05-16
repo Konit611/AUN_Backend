@@ -49,6 +49,15 @@ class SakeFlavor(SQLModel, table=True):
     position: int = 0
 
 
+class SakanaCategory(SQLModel, table=True):
+    __tablename__ = "sakana_category"
+
+    id: int | None = Field(default=None, primary_key=True)
+    slug: str = Field(unique=True, index=True)
+    label: str
+    position: int = 0
+
+
 class Sakana(SQLModel, table=True):
     __tablename__ = "sakana"
 
@@ -57,6 +66,7 @@ class Sakana(SQLModel, table=True):
         primary_key=True,
     )
     name: str = Field(unique=True, index=True)
+    category_id: int = Field(foreign_key="sakana_category.id", index=True)
     emoji: str
     description: str | None = None
     image_placeholder: str | None = None
