@@ -40,11 +40,14 @@ def _summary(s: Sakana) -> dict:
 
 def _detail(
     s: Sakana,
+    category: SakanaCategory | None,
     paired_sakes: list[tuple[SakeSakana, Sake]],
     suggested_sakes: list[Sake],
 ) -> dict:
     return {
         **_summary(s),
+        "categoryLabel": category.label if category else None,
+        "categorySlug": category.slug if category else None,
         "description": s.description,
         "ingredients": s.ingredients or [],
         "steps": s.steps or [],
@@ -123,4 +126,6 @@ def get_sakana(sakana_id: str, session: Session = Depends(get_session)):
     all_sakes = session.exec(select(Sake)).all()
     suggested = [s for s, _ in rank_sakes(sakana, all_sakes, "synergy", top_k=3)]
 
-    return _detail(sakana, paired, suggested)
+    category = session.get(SakanaCategory, sakana.category_id)
+
+    return _detail(sakana, category, paired, suggested)
