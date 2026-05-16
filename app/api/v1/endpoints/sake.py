@@ -21,6 +21,7 @@ def _serialize_summary(sake: Sake) -> dict:
         "brewery": sake.brewery,
         "region": sake.region,
         "servingTags": _serving_tags(sake),
+        "imageUrl": sake.image_url,
     }
 
 
