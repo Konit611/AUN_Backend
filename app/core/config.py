@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     def COOKIE_SECURE(self) -> bool:
         return not self.DEBUG
 
-    model_config = {"env_file": ".env"}
+    model_config = {"env_file": ".env", "extra": "ignore"}
 
 
 settings = Settings()
