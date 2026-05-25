@@ -248,6 +248,78 @@ def list_flavors(session: Session = Depends(get_session)) -> list[dict]:
     return [{"id": f.id, "label": f.label} for f in rows]
 
 
+# ── Flavor CRUD ──────────────────────────────────────────────────────────────
+
+flavor_router = APIRouter(
+    prefix="/admin/flavors",
+    tags=["admin-sake"],
+    dependencies=[Depends(require_admin)],
+)
+
+
+class FlavorLabelInput(BaseModel):
+    label: str = Field(min_length=1, max_length=50)
+
+
+def _serialize_flavor(f: Flavor) -> dict[str, Any]:
+    return {"id": f.id, "label": f.label}
+
+
+@flavor_router.get("")
+def list_all_flavors(session: Session = Depends(get_session)) -> list[dict]:
+    rows = session.exec(select(Flavor).order_by(Flavor.label.asc())).all()
+    return [_serialize_flavor(f) for f in rows]
+
+
+@flavor_router.post("", status_code=status.HTTP_201_CREATED)
+def create_flavor(
+    body: FlavorLabelInput, session: Session = Depends(get_session)
+) -> dict:
+    if session.exec(select(Flavor).where(Flavor.label == body.label)).first():
+        raise HTTPException(status_code=409, detail="Label already exists")
+    f = Flavor(label=body.label)
+    session.add(f)
+    session.commit()
+    session.refresh(f)
+    return _serialize_flavor(f)
+
+
+@flavor_router.put("/{flavor_id}")
+def update_flavor(
+    flavor_id: str, body: FlavorLabelInput, session: Session = Depends(get_session)
+) -> dict:
+    f = session.get(Flavor, flavor_id)
+    if not f:
+        raise HTTPException(status_code=404, detail="Flavor not found")
+    clash = session.exec(
+        select(Flavor).where(Flavor.label == body.label, Flavor.id != flavor_id)
+    ).first()
+    if clash:
+        raise HTTPException(status_code=409, detail="Label already exists")
+    f.label = body.label
+    session.add(f)
+    session.commit()
+    session.refresh(f)
+    return _serialize_flavor(f)
+
+
+@flavor_router.delete("/{flavor_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_flavor(flavor_id: str, session: Session = Depends(get_session)) -> None:
+    f = session.get(Flavor, flavor_id)
+    if not f:
+        raise HTTPException(status_code=404, detail="Flavor not found")
+    in_use = session.exec(
+        select(SakeFlavor).where(SakeFlavor.flavor_id == flavor_id)
+    ).first()
+    if in_use:
+        raise HTTPException(
+            status_code=409,
+            detail="このタグはいずれかの日本酒に使用されています。先に解除してください。",
+        )
+    session.delete(f)
+    session.commit()
+
+
 @router.get("/_meta/sakana")
 def list_sakana_for_pairing(
     session: Session = Depends(get_session),
