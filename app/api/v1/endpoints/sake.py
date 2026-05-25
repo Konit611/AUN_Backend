@@ -31,6 +31,7 @@ def _serialize_pairing(sakana: Sakana, description: str = "") -> dict:
         "emoji": sakana.emoji,
         "foodName": sakana.name,
         "description": description,
+        "foodImageUrl": sakana.food_image_url or "",
         "imagePlaceholder": sakana.image_placeholder or "",
     }
 
