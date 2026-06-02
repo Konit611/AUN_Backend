@@ -146,35 +146,47 @@ def get_home(
     session: Session = Depends(get_session),
     viewer: User | None = Depends(get_optional_user),
 ):
-    items = session.exec(
+    # Seasonal: items from the single featured category (admin-designated)
+    featured_cat = session.exec(
+        select(PairingCategory).where(PairingCategory.is_featured.is_(True))
+    ).first()
+
+    if featured_cat:
+        seasonal_items = session.exec(
+            select(PairingItem)
+            .where(
+                PairingItem.category_id == featured_cat.id,
+                PairingItem.is_draft.is_(False),
+            )
+            .order_by(PairingItem.position.asc())
+            .limit(3)
+        ).all()
+        seasonal = _resolve_many(session, seasonal_items)
+        seasonal_label = featured_cat.label
+    else:
+        seasonal = []
+        seasonal_label = ""
+
+    # Classic: season=="通年" items only, no padding
+    classic_items = session.exec(
         select(PairingItem)
-        .where(PairingItem.is_draft.is_(False))
+        .where(
+            PairingItem.season == "通年",
+            PairingItem.is_draft.is_(False),
+        )
         .order_by(PairingItem.position.asc())
+        .limit(4)
     ).all()
-    resolved = _resolve_many(session, items)
-
-    seasonal = [t for t in resolved if t[0].season == "冬"][:3]
-    if len(seasonal) < 3:
-        seasonal = resolved[:3]
-
-    classic = [t for t in resolved if t[0].season == "通年"]
-    if len(classic) < 4:
-        seen = {t[0].id for t in classic}
-        for t in resolved:
-            if t[0].id not in seen:
-                classic.append(t)
-                if len(classic) >= 4:
-                    break
-    classic = classic[:4]
+    classic = _resolve_many(session, classic_items)
 
     sakana_cats = session.exec(
         select(SakanaCategory).order_by(SakanaCategory.position.asc())
     ).all()
 
-    featured = _featured_sake(session, viewer)
+    featured_sake = _featured_sake(session, viewer)
     return {
         "seasonal": {
-            "label": "WINTER COLLECTION",
+            "label": seasonal_label,
             "items": [_home_card(*t) for t in seasonal],
         },
         "classic": {
@@ -183,7 +195,7 @@ def get_home(
         "foodCategories": [
             {"key": c.slug, "label": c.label} for c in sakana_cats
         ],
-        "featuredSake": _serialize_featured(*featured) if featured else None,
+        "featuredSake": _serialize_featured(*featured_sake) if featured_sake else None,
     }
 
 

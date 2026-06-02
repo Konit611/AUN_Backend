@@ -23,6 +23,7 @@ class CategoryInput(BaseModel):
     label: str = Field(min_length=1, max_length=40)
     title: str = Field(min_length=1, max_length=80)
     position: int = 0
+    is_featured: bool = False
 
 
 class PairingItemInput(BaseModel):
@@ -51,6 +52,7 @@ def _serialize_category(c: PairingCategory) -> dict[str, Any]:
         "label": c.label,
         "title": c.title,
         "position": c.position,
+        "isFeatured": c.is_featured,
     }
 
 
@@ -106,6 +108,17 @@ def list_categories(session: Session = Depends(get_session)) -> list[dict]:
     return [_serialize_category(c) for c in rows]
 
 
+def _clear_featured(session: Session, exclude_id: int | None = None) -> None:
+    """Unset is_featured on all categories except exclude_id."""
+    others = session.exec(
+        select(PairingCategory).where(PairingCategory.is_featured.is_(True))
+    ).all()
+    for c in others:
+        if c.id != exclude_id:
+            c.is_featured = False
+            session.add(c)
+
+
 @router.post("/pairing-categories", status_code=status.HTTP_201_CREATED)
 def create_category(
     body: CategoryInput, session: Session = Depends(get_session)
@@ -114,6 +127,8 @@ def create_category(
         select(PairingCategory).where(PairingCategory.slug == body.slug)
     ).first():
         raise HTTPException(status_code=409, detail="Slug already exists")
+    if body.is_featured:
+        _clear_featured(session)
     cat = PairingCategory(**body.model_dump())
     session.add(cat)
     session.commit()
@@ -139,6 +154,8 @@ def update_category(
         ).first()
         if clash:
             raise HTTPException(status_code=409, detail="Slug already exists")
+    if body.is_featured:
+        _clear_featured(session, exclude_id=category_id)
     for k, v in body.model_dump().items():
         setattr(cat, k, v)
     session.add(cat)

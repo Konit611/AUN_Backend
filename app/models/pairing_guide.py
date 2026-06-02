@@ -12,6 +12,7 @@ class PairingCategory(SQLModel, table=True):
     label: str
     title: str
     position: int = 0
+    is_featured: bool = Field(default=False)
 
 
 class PairingItem(SQLModel, table=True):
