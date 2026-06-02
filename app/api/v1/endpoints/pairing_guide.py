@@ -53,6 +53,7 @@ def _home_card(item: PairingItem, sake: Sake, sakana: Sakana) -> dict:
         "sake": sake.name,
         "temperature": item.temperature,
         "description": item.description,
+        "heroImage": item.hero_image,
     }
 
 
