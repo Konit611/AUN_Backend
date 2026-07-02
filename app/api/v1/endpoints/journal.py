@@ -9,6 +9,7 @@ from sqlmodel import Session, select
 from app.api.deps import get_current_user
 from app.core.database import get_session
 from app.models.journal import JournalEntry
+from app.models.sake import Sake
 from app.models.user import User
 
 router = APIRouter()
@@ -32,6 +33,7 @@ class TastingNote(BaseModel):
 
 
 class JournalEntryCreate(BaseModel):
+    sakeId: Optional[str] = None
     sakeName: str
     brewery: Optional[str] = None
     category: Optional[str] = None
@@ -44,6 +46,8 @@ class JournalEntryCreate(BaseModel):
 def _serialize(entry: JournalEntry) -> dict:
     return {
         "id": entry.id,
+        "sakeId": entry.sake_id,
+        "isVerified": entry.sake_id is not None,
         "sakeName": entry.sake_name,
         "brewery": entry.brewery,
         "category": entry.category,
@@ -52,6 +56,24 @@ def _serialize(entry: JournalEntry) -> dict:
         "tasting": entry.tasting,
         "imagePath": entry.image_path,
     }
+
+
+def _resolve_sake(body: JournalEntryCreate, session: Session) -> tuple[str | None, str, str | None]:
+    """Return (sake_id, sake_name, brewery).
+
+    If a catalog sakeId is supplied, validate it and take the name/brewery
+    snapshot from the catalog so verified entries stay authoritative.
+    Otherwise trust the manually-entered text (off-catalog, unverified).
+    """
+    if body.sakeId:
+        sake = session.get(Sake, body.sakeId)
+        if not sake:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Sake '{body.sakeId}' not found",
+            )
+        return sake.id, sake.name, sake.brewery
+    return None, body.sakeName, body.brewery
 
 
 @router.get("/journal")
@@ -105,10 +127,12 @@ def create_entry(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ):
+    sake_id, sake_name, brewery = _resolve_sake(body, session)
     entry = JournalEntry(
         user_id=current_user.id,
-        sake_name=body.sakeName,
-        brewery=body.brewery,
+        sake_id=sake_id,
+        sake_name=sake_name,
+        brewery=brewery,
         category=body.category,
         date=body.date,
         rating=body.rating,
@@ -134,8 +158,10 @@ def update_entry(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Journal entry '{entry_id}' not found",
         )
-    entry.sake_name = body.sakeName
-    entry.brewery = body.brewery
+    sake_id, sake_name, brewery = _resolve_sake(body, session)
+    entry.sake_id = sake_id
+    entry.sake_name = sake_name
+    entry.brewery = brewery
     entry.category = body.category
     entry.date = body.date
     entry.rating = body.rating

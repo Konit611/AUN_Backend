@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import or_
 from sqlmodel import Session, select
 
 from app.api.v1.schemas import paginate
@@ -80,8 +81,19 @@ def list_sake(
     page: int = 1,
     page_size: int = 20,
     persona: str | None = None,
+    search: str | None = None,
     session: Session = Depends(get_session),
 ):
+    if search is not None and search.strip():
+        pattern = f"%{search.strip()}%"
+        sakes = session.exec(
+            select(Sake)
+            .where(or_(Sake.name.ilike(pattern), Sake.brewery.ilike(pattern)))
+            .order_by(Sake.name.asc())
+        ).all()
+        items = [_serialize_summary(s) for s in sakes]
+        return paginate(items, page, page_size)
+
     if persona is not None:
         if not is_valid_code(persona):
             raise HTTPException(

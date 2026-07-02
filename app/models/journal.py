@@ -15,6 +15,7 @@ class JournalEntry(SQLModel, table=True):
         primary_key=True,
     )
     user_id: int = Field(foreign_key="user.id", index=True)
+    sake_id: str | None = Field(default=None, foreign_key="sake.id", index=True)
     sake_name: str
     brewery: str | None = None
     category: str | None = None
