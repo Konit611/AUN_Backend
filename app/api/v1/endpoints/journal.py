@@ -30,6 +30,7 @@ class TastingNote(BaseModel):
     temperature: str
     pairing: Optional[str] = None
     memo: Optional[str] = None
+    impression: Optional[str] = None
 
 
 class JournalEntryCreate(BaseModel):

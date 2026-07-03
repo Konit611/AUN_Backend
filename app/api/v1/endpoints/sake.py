@@ -5,7 +5,7 @@ from sqlmodel import Session, select
 from app.api.v1.schemas import paginate
 from app.core.database import get_session
 from app.core.pairing_score import rank_sakana
-from app.core.persona_profile import distance, is_valid_code
+from app.core.persona_profile import distance, is_valid_code, journal_profile
 from app.models.sake import Flavor, Sake, SakeFlavor, SakeSakana, Sakana
 
 router = APIRouter()
@@ -23,6 +23,7 @@ def _serialize_summary(sake: Sake) -> dict:
         "region": sake.region,
         "servingTags": _serving_tags(sake),
         "imageUrl": sake.image_url,
+        "profile": journal_profile(sake),
     }
 
 

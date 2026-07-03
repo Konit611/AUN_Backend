@@ -53,6 +53,24 @@ def ideal_vector(code: str) -> dict[str, float]:
     }
 
 
+def journal_profile(sake: Sake) -> dict[str, int]:
+    """Map a sake's measured taste axes to the journal's 4-axis profile
+    (each 0-100, where the lower end is the left-hand label of the slider:
+    甘口 / 重厚 / 華やか / 力強い). Used to pre-fill a new journal entry when
+    the user records a catalog sake.
+    """
+
+    def axis(value: float) -> int:
+        return round((1.0 - value) * 100)
+
+    return {
+        "sweetDry": axis(sake.sweetness),   # 甘口 ↔ 辛口
+        "heavyLight": axis(sake.umami),     # 重厚 ↔ 軽快
+        "richCalm": axis(sake.aroma),       # 華やか ↔ 穏やか
+        "boldSmooth": axis(sake.acidity),   # 力強い ↔ 滑らか
+    }
+
+
 def distance(sake: Sake, code: str) -> float:
     ideal = ideal_vector(code)
     sq = 0.0
